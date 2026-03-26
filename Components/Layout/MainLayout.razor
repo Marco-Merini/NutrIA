@@ -1,0 +1,51 @@
+@inherits LayoutComponentBase
+
+<MudThemeProvider Theme="@_theme" />
+<MudDialogProvider />
+<MudSnackbarProvider />
+<MudPopoverProvider />
+
+<MudLayout>
+    <MudDrawer Open="true" Elevation="0" Variant="DrawerVariant.Persistent" Width="260px" Class="nutri-drawer">
+        <!-- Logo Area -->
+        <div class="d-flex align-center py-4 px-4 nutri-brand">
+            <MudIcon Icon="@Icons.Material.Filled.Spa" Color="Color.Success" Size="Size.Large" Class="mr-3" />
+            <div>
+                <MudText Typo="Typo.h6" Class="nutri-brand-title">NutriAI</MudText>
+                <MudText Typo="Typo.caption" Class="nutri-brand-subtitle">Sistema Nutricional</MudText>
+            </div>
+        </div>
+        
+        <NavMenu />
+    </MudDrawer>
+
+    <MudMainContent Class="nutri-main-content">
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-8 px-8">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+<div id="blazor-error-ui">
+    An unhandled error has occurred.
+    <a href="" class="reload">Reload</a>
+    <a class="dismiss">🗙</a>
+</div>
+
+@code {
+    private MudTheme _theme = new MudTheme()
+    {
+        PaletteLight = new PaletteLight()
+        {
+            Primary = "#2bd07b",        // Vibrant green from the mockups
+            Secondary = "#f0f2f5",
+            AppbarBackground = "#151a24",
+            Background = "#f5f6f8",     // Light gray background
+            Surface = "#ffffff",        // White cards
+            DrawerBackground = "#151a24", // Very dark navy/gray
+            DrawerText = "#878a94",     // Inactive text
+            TextPrimary = "#1a1e29",
+            TextSecondary = "#6b7280"
+        }
+    };
+}
