@@ -1,0 +1,178 @@
+@page "/"
+@using NutriFlow.Services
+@inject ApiService ApiService
+
+<PageTitle>Dashboard - NutriAI</PageTitle>
+
+<div class="mb-8">
+    <MudText Typo="Typo.h5" Class="font-bold">Bem-vindo ao NutriAI</MudText>
+    <MudText Typo="Typo.body2" Color="Color.Surface" Style="color: #6b7280;">
+        @DateTime.Now.ToString("dddd, dd 'de' MMMM 'de' yyyy", new System.Globalization.CultureInfo("pt-BR"))
+    </MudText>
+</div>
+
+<!-- Stat Cards Row -->
+<MudGrid Class="mb-6">
+    <!-- Stat 1 -->
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="nutri-card h-100" Elevation="0">
+            <div class="stat-card-container">
+                <div>
+                    <MudText Typo="Typo.caption" Style="color: #6b7280;">Pacientes Ativos</MudText>
+                    <MudText Typo="Typo.h4" Class="font-bold mt-1">@pacientesCount</MudText>
+                    <MudText Typo="Typo.caption" Style="color: #a0aabf;" Class="mt-1 d-block">@pacientesCount no total</MudText>
+                </div>
+                <div class="stat-icon-wrapper icon-green">
+                    <MudIcon Icon="@Icons.Material.Filled.PeopleAlt" Size="Size.Small" />
+                </div>
+            </div>
+        </MudPaper>
+    </MudItem>
+
+    <!-- Stat 2 -->
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="nutri-card h-100" Elevation="0">
+            <div class="stat-card-container">
+                <div>
+                    <MudText Typo="Typo.caption" Style="color: #6b7280;">Planos Ativos</MudText>
+                    <MudText Typo="Typo.h4" Class="font-bold mt-1">@planosCount</MudText>
+                    <MudText Typo="Typo.caption" Style="color: #a0aabf;" Class="mt-1 d-block">planos alimentares</MudText>
+                </div>
+                <div class="stat-icon-wrapper icon-blue">
+                    <MudIcon Icon="@Icons.Material.Filled.Fastfood" Size="Size.Small" />
+                </div>
+            </div>
+        </MudPaper>
+    </MudItem>
+
+    <!-- Stat 3 -->
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="nutri-card h-100" Elevation="0">
+            <div class="stat-card-container">
+                <div>
+                    <MudText Typo="Typo.caption" Style="color: #6b7280;">Registros de Progresso</MudText>
+                    <MudText Typo="Typo.h4" Class="font-bold mt-1">@progressosCount</MudText>
+                    <MudText Typo="Typo.caption" Style="color: #a0aabf;" Class="mt-1 d-block">últimos registros</MudText>
+                </div>
+                <div class="stat-icon-wrapper icon-orange">
+                    <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Small" />
+                </div>
+            </div>
+        </MudPaper>
+    </MudItem>
+
+    <!-- Stat 4 -->
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="nutri-card h-100" Elevation="0">
+            <div class="stat-card-container">
+                <div>
+                    <MudText Typo="Typo.caption" Style="color: #6b7280;">Sessões Registradas</MudText>
+                    <MudText Typo="Typo.h4" Class="font-bold mt-1">@sessoesCount</MudText>
+                    <MudText Typo="Typo.caption" Style="color: #a0aabf;" Class="mt-1 d-block">consultas</MudText>
+                </div>
+                <div class="stat-icon-wrapper icon-purple">
+                    <MudIcon Icon="@Icons.Material.Filled.EventNote" Size="Size.Small" />
+                </div>
+            </div>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<!-- Recent Lists Row -->
+<MudGrid>
+    <!-- Pacientes Recentes -->
+    <MudItem xs="12" md="6">
+        <MudPaper Class="nutri-card pa-6 h-100" Elevation="0">
+            <div class="d-flex justify-space-between align-center mb-4">
+                <MudText Typo="Typo.subtitle1" Class="font-bold">Pacientes Recentes</MudText>
+                <MudLink Href="/pacientes" Color="Color.Primary" Typo="Typo.body2" Underline="Underline.None">Ver todos →</MudLink>
+            </div>
+            
+            <div class="d-flex flex-column gap-3">
+                @foreach (var p in pacientesRecentes)
+                {
+                    <div class="d-flex justify-space-between align-center p-3 rounded-lg" style="background-color: #f9fafb;">
+                        <div class="d-flex align-center gap-3">
+                            <div class="avatar-initials">
+                                @(string.IsNullOrEmpty(p.Nome) ? "?" : p.Nome.Substring(0, 1).ToUpper())
+                            </div>
+                            <div>
+                                <MudText Typo="Typo.body2" Class="font-bold">@p.Nome</MudText>
+                                <MudText Typo="Typo.caption" Style="color: #6b7280;">@p.Objetivo</MudText>
+                            </div>
+                        </div>
+                        <span class="status-badge ativo">ativo</span>
+                    </div>
+                }
+            </div>
+        </MudPaper>
+    </MudItem>
+
+    <!-- Sessões Recentes -->
+    <MudItem xs="12" md="6">
+        <MudPaper Class="nutri-card pa-6 h-100" Elevation="0">
+            <div class="d-flex justify-space-between align-center mb-4">
+                <MudText Typo="Typo.subtitle1" Class="font-bold">Sessões Recentes</MudText>
+                <MudLink Href="/sessoes" Color="Color.Primary" Typo="Typo.body2" Underline="Underline.None">Ver todas →</MudLink>
+            </div>
+
+            <div class="d-flex flex-column gap-3">
+                @foreach (var s in sessoesRecentes)
+                {
+                    <div class="d-flex align-center p-3 rounded-lg gap-3" style="background-color: #f9fafb;">
+                        <div class="stat-icon-wrapper icon-blue" style="width: 40px; height: 40px;">
+                            <MudIcon Icon="@Icons.Material.Filled.EventNote" Size="Size.Small" />
+                        </div>
+                        <div>
+                            <MudText Typo="Typo.body2" Class="font-bold">@s.PacienteNome</MudText>
+                            <MudText Typo="Typo.caption" Style="color: #6b7280;">
+                                @s.Data.ToString("yyyy-MM-dd") · @s.Tipo
+                            </MudText>
+                        </div>
+                    </div>
+                }
+            </div>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private int pacientesCount = 3;
+    private int planosCount = 2;
+    private int progressosCount = 5;
+    private int sessoesCount = 3;
+
+    private List<PacienteResumo> pacientesRecentes = new()
+    {
+        new() { Nome = "Ana Paula Ferreira", Objetivo = "perda peso", Status = "ativo" },
+        new() { Nome = "Carlos Eduardo Silva", Objetivo = "ganho massa", Status = "ativo" },
+        new() { Nome = "Mariana Costa", Objetivo = "saude geral", Status = "ativo" }
+    };
+
+    private List<SessaoResumo> sessoesRecentes = new()
+    {
+        new() { PacienteNome = "Ana Paula Ferreira", Data = new DateTime(2025, 03, 15), Tipo = "retorno" },
+        new() { PacienteNome = "Ana Paula Ferreira", Data = new DateTime(2025, 03, 01), Tipo = "consulta inicial" },
+        new() { PacienteNome = "Carlos Eduardo Silva", Data = new DateTime(2025, 03, 01), Tipo = "consulta inicial" }
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Mock data loading
+        await Task.Delay(100);
+    }
+
+    public class PacienteResumo
+    {
+        public string Nome { get; set; } = "";
+        public string Objetivo { get; set; } = "";
+        public string Status { get; set; } = "";
+    }
+
+    public class SessaoResumo
+    {
+        public string PacienteNome { get; set; } = "";
+        public DateTime Data { get; set; }
+        public string Tipo { get; set; } = "";
+    }
+}
