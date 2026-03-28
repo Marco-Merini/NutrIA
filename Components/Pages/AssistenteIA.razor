@@ -1,0 +1,74 @@
+@page "/ia"
+
+<PageTitle>Assistente RAG - NutriAI</PageTitle>
+
+<div class="mb-8">
+    <div class="d-flex align-center gap-3 mb-2">
+        <MudIcon Icon="@Icons.Material.Filled.Psychology" Style="color: #a855f7; font-size: 2rem;" />
+        <MudText Typo="Typo.h5" Class="font-bold">Assistente IA</MudText>
+    </div>
+    <MudText Typo="Typo.body2" Style="color: #6b7280;">Busca vetorial semântica sobre o histórico dos pacientes</MudText>
+</div>
+
+<!-- Selector -->
+<div class="mb-8">
+    <MudSelect T="int" @bind-Value="selectedPacienteId" Placeholder="Selecione o paciente" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter" Class="bg-white rounded-lg">
+        @foreach (var p in pacientes)
+        {
+            <MudSelectItem Value="@p.Id">@p.Nome</MudSelectItem>
+        }
+    </MudSelect>
+</div>
+
+<!-- Chat Area -->
+<div class="d-flex flex-column" style="min-height: calc(100vh - 350px); justify-content: space-between;">
+    <!-- Messages -->
+    <div class="d-flex flex-column gap-4">
+        <div class="d-flex gap-3">
+            <MudAvatar Style="background-color: #f3e8ff; color: #a855f7; width: 32px; height: 32px;" Class="mt-1">
+                <MudIcon Icon="@Icons.Material.Filled.Psychology" Size="Size.Small" />
+            </MudAvatar>
+            <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid #e5e7eb; border-radius: 12px; border-top-left-radius: 4px; max-width: 85%;">
+                <MudText Typo="Typo.body2" Style="color: #374151; line-height: 1.6;">
+                    Olá! Sou o assistente IA nutricional. Para começar, selecione um paciente e clique em <b>Indexar</b> para carregar os dados no sistema de busca vetorial. Depois farei perguntas baseadas no histórico real do paciente.
+                </MudText>
+            </MudPaper>
+        </div>
+    </div>
+
+    <!-- Bottom Input Area -->
+    <div class="mt-auto pt-6">
+        <!-- Suggestion Chips -->
+        <div class="d-flex flex-wrap gap-2 mb-4">
+            <MudChip T="string" Style="background-color: #f3f4f6; color: #6b7280; font-weight: 500;" Class="rounded-pill px-3 py-1 border-0" Variant="Variant.Filled">Qual a evolução do peso do paciente?</MudChip>
+            <MudChip T="string" Style="background-color: #f3f4f6; color: #6b7280; font-weight: 500;" Class="rounded-pill px-3 py-1 border-0" Variant="Variant.Filled">Como está a aderência ao plano alimentar?</MudChip>
+            <MudChip T="string" Style="background-color: #f3f4f6; color: #6b7280; font-weight: 500;" Class="rounded-pill px-3 py-1 border-0" Variant="Variant.Filled">Quais são as restrições alimentares do paciente?</MudChip>
+            <MudChip T="string" Style="background-color: #f3f4f6; color: #6b7280; font-weight: 500;" Class="rounded-pill px-3 py-1 border-0" Variant="Variant.Filled">Resumo das últimas sessões</MudChip>
+        </div>
+
+        <!-- Input Field & Send Button -->
+        <div class="d-flex align-stretch gap-3">
+            <MudTextField @bind-Value="userMessage" Placeholder="Faça uma pergunta sobre o paciente... (Enter para enviar)" Variant="Variant.Outlined" Class="bg-white flex-grow-1" Style="border-radius: 8px;" />
+            <MudIconButton Icon="@Icons.Material.Filled.Send" Style="background-color: #8ae4b9; color: white; width: 56px; height: 56px; border-radius: 8px;" Class="mt-1" />
+        </div>
+    </div>
+</div>
+
+@code {
+    private int selectedPacienteId;
+    private string userMessage = "";
+
+    // Mock data for the dropdown
+    private List<PacienteViewModel> pacientes = new()
+    {
+        new() { Id = 1, Nome = "Ana Paula Ferreira" },
+        new() { Id = 2, Nome = "Carlos Eduardo Silva" },
+        new() { Id = 3, Nome = "Mariana Costa" }
+    };
+
+    public class PacienteViewModel
+    {
+        public int Id { get; set; }
+        public string Nome { get; set; } = "";
+    }
+}

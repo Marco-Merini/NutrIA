@@ -1,0 +1,105 @@
+@page "/progresso"
+
+<PageTitle>Progresso - NutriAI</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-6">
+    <div>
+        <MudText Typo="Typo.h5" Class="font-bold">Monitoramento de Progresso</MudText>
+        <MudText Typo="Typo.body2" Style="color: #6b7280;">Acompanhe a evolução dos pacientes</MudText>
+    </div>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Class="rounded-lg text-none px-4">
+        Registrar Progresso
+    </MudButton>
+</div>
+
+<!-- Filters -->
+<div class="d-flex gap-2 mb-6">
+    <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Style="border-radius: 8px;">Todos</MudChip>
+    <MudChip T="string" Color="Color.Default" Variant="Variant.Filled" Style="border-radius: 8px; background-color: #f0f2f5;">Ana Paula Ferreira</MudChip>
+    <MudChip T="string" Color="Color.Default" Variant="Variant.Filled" Style="border-radius: 8px; background-color: #f0f2f5;">Carlos Eduardo Silva</MudChip>
+    <MudChip T="string" Color="Color.Default" Variant="Variant.Filled" Style="border-radius: 8px; background-color: #f0f2f5;">Mariana Costa</MudChip>
+</div>
+
+<!-- Chart Area -->
+<MudPaper Class="nutri-card pa-6 mb-6" Elevation="0">
+    <MudText Typo="Typo.subtitle1" Class="font-bold mb-4">Evolução do Peso</MudText>
+    <MudChart ChartType="ChartType.Line" ChartSeries="@Series" @bind-SelectedIndex="Index" XAxisLabels="@XAxisLabels" Width="100%" Height="300px" ChartOptions="@Options" />
+</MudPaper>
+
+<!-- Progress List -->
+<div class="d-flex flex-column gap-4">
+    @foreach (var p in progressos)
+    {
+        <MudPaper Class="nutri-card pa-4 d-flex justify-space-between align-start" Elevation="0">
+            <div class="d-flex gap-4">
+                <div class="stat-icon-wrapper icon-orange" style="width: 48px; height: 48px; flex-shrink: 0;">
+                    <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Medium" />
+                </div>
+                <div>
+                    <div class="d-flex align-center gap-3 mb-1">
+                        <MudText Typo="Typo.subtitle2" Class="font-bold">@p.PacienteNome</MudText>
+                        <MudText Typo="Typo.caption" Style="color: #a0aabf;">@p.DataRegistro.ToString("yyyy-MM-dd")</MudText>
+                    </div>
+                    
+                    <div class="d-flex align-center gap-3 mb-2">
+                        <MudText Typo="Typo.body2" Style="color: #6b7280;">@p.Peso kg</MudText>
+                        <span class="status-badge ativo">Aderência: @p.AderenciaPlano</span>
+                        <MudText Typo="Typo.body2" Style="color: #6b7280;">Energia: @p.Energia</MudText>
+                    </div>
+                    
+                    <MudText Typo="Typo.body2" Style="color: #6b7280;">@p.Feedback</MudText>
+                </div>
+            </div>
+            
+            <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Size="Size.Small" Color="Color.Error" />
+        </MudPaper>
+    }
+</div>
+
+@code {
+    private int Index = -1;
+    public ChartOptions Options = new ChartOptions()
+    {
+        LineStrokeWidth = 3,
+        MaxNumYAxisTicks = 5,
+        YAxisFormat = "0 'kg'",
+        ChartPalette = new[] { "#2bd07b" }
+    };
+
+    public List<ChartSeries> Series = new List<ChartSeries>()
+    {
+        new ChartSeries() { Name = "Peso", Data = new double[] { 88, 72.5, 71.2, 70.1, 89 } } // Mock values
+    };
+
+    public string[] XAxisLabels = { "2025-03-01", "2025-03-15", "2025-04-01", "2025-04-15" };
+
+    private List<ProgressoViewModel> progressos = new()
+    {
+        new() { 
+            PacienteNome = "Ana Paula Ferreira", 
+            DataRegistro = new DateTime(2025, 04, 01), 
+            Peso = 70.1m, 
+            AderenciaPlano = "excelente", 
+            Energia = "alta", 
+            Feedback = "Ótima evolução! Glicemia controlando bem." 
+        },
+        new() { 
+            PacienteNome = "Carlos Eduardo Silva", 
+            DataRegistro = new DateTime(2025, 04, 01), 
+            Peso = 89.0m, 
+            AderenciaPlano = "boa", 
+            Energia = "alta", 
+            Feedback = "Adaptação inicial positiva. Aumento de força." 
+        }
+    };
+
+    public class ProgressoViewModel
+    {
+        public string PacienteNome { get; set; } = "";
+        public DateTime DataRegistro { get; set; }
+        public decimal Peso { get; set; }
+        public string AderenciaPlano { get; set; } = "";
+        public string Energia { get; set; } = "";
+        public string Feedback { get; set; } = "";
+    }
+}

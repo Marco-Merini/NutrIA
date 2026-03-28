@@ -1,0 +1,67 @@
+@page "/pacientes"
+
+<PageTitle>Pacientes - NutriAI</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-6">
+    <div>
+        <MudText Typo="Typo.h5" Class="font-bold">Pacientes</MudText>
+        <MudText Typo="Typo.body2" Style="color: #6b7280;">Gerencie os perfis dos seus pacientes</MudText>
+    </div>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Class="rounded-lg text-none px-4">
+        Novo Paciente
+    </MudButton>
+</div>
+
+<!-- Search Bar -->
+<div class="mb-6">
+    <MudTextField @bind-Value="searchTerm" Placeholder="Buscar paciente por nome ou email..." 
+                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" 
+                  Variant="Variant.Outlined" Class="nutri-search-input bg-white" Underline="false" />
+</div>
+
+<!-- Patient List -->
+<div class="d-flex flex-column gap-4">
+    @foreach (var p in pacientes)
+    {
+        <MudPaper Class="nutri-card pa-4 d-flex justify-space-between align-center" Elevation="0">
+            <div class="d-flex align-center gap-4">
+                <div class="avatar-initials" style="width: 48px; height: 48px; font-size: 1.1rem;">
+                    @p.Nome.Substring(0, 1).ToUpper()
+                </div>
+                <div>
+                    <MudText Typo="Typo.subtitle1" Class="font-bold">@p.Nome</MudText>
+                    <div class="d-flex align-center gap-3 mt-1">
+                        <span class="status-badge" style="background-color: #e5f9f0; color: #2bd07b;">@p.Objetivo</span>
+                        <MudText Typo="Typo.caption" Style="color: #6b7280;">@p.PesoAtual kg</MudText>
+                        <MudText Typo="Typo.caption" Style="color: #6b7280;">@p.Email</MudText>
+                    </div>
+                </div>
+            </div>
+            <div class="d-flex align-center gap-4">
+                <span class="status-badge ativo">ativo</span>
+                <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" Style="color: #a0aabf;" />
+                <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Size="Size.Small" Color="Color.Error" />
+            </div>
+        </MudPaper>
+    }
+</div>
+
+@code {
+    private string searchTerm = "";
+
+    private List<PacienteViewModel> pacientes = new()
+    {
+        new() { Nome = "Ana Paula Ferreira", Objetivo = "Perda de Peso", PesoAtual = 72.5m, Email = "ana.ferreira@email.com", Status = "ativo" },
+        new() { Nome = "Carlos Eduardo Silva", Objetivo = "Ganho de Massa", PesoAtual = 88m, Email = "carlos.silva@email.com", Status = "ativo" },
+        new() { Nome = "Mariana Costa", Objetivo = "Saúde Geral", PesoAtual = 58m, Email = "mariana.costa@email.com", Status = "ativo" }
+    };
+
+    public class PacienteViewModel
+    {
+        public string Nome { get; set; } = "";
+        public string Objetivo { get; set; } = "";
+        public decimal PesoAtual { get; set; }
+        public string Email { get; set; } = "";
+        public string Status { get; set; } = "";
+    }
+}
