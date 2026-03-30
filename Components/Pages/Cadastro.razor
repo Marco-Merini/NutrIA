@@ -1,0 +1,89 @@
+@page "/cadastro"
+@layout NutriFlow.Components.Layout.AuthLayout
+@inject NavigationManager Navigation
+@inject NutriFlow.Services.AuthService AuthService
+@using NutriFlow.Models
+
+<PageTitle>Cadastro - NutriAI</PageTitle>
+
+<MudPaper Elevation="3" Class="pa-8 d-flex flex-column rounded-xl" Width="450px" Style="border: 1px solid #e5e7eb;">
+    <div class="d-flex justify-center mb-4">
+        <MudIcon Icon="@Icons.Material.Filled.PersonAdd" Color="Color.Primary" Size="Size.Large" />
+    </div>
+    
+    <MudText Typo="Typo.h5" Align="Align.Center" Class="mb-1 font-bold">Criar Conta</MudText>
+    <MudText Typo="Typo.body2" Align="Align.Center" Style="color: #6b7280;" Class="mb-6">Preencha seus dados para se cadastrar como nutricionista</MudText>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+    }
+
+    <MudForm @ref="form" @bind-IsValid="@success" @bind-Errors="@errors">
+        <MudTextField T="string" @bind-Value="nome" Label="Nome" InputType="InputType.Text" Required="true" RequiredError="O nome é obrigatório" Variant="Variant.Outlined" Class="mb-4 bg-white" />
+        <MudTextField T="string" @bind-Value="email" Label="Email" InputType="InputType.Email" Required="true" RequiredError="O email é obrigatório" Variant="Variant.Outlined" Class="mb-4 bg-white" />
+        <MudTextField T="string" @bind-Value="senha" Label="Senha" InputType="InputType.Password" Required="true" RequiredError="A senha é obrigatória" Variant="Variant.Outlined" Class="mb-6 bg-white" />
+        
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" FullWidth="true" OnClick="DoRegister" Disabled="@isLoading" Class="rounded-lg py-3 font-bold text-white">
+            @if (isLoading)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true"/>
+                <MudText Class="ms-2">Cadastrando...</MudText>
+            }
+            else
+            {
+                <text>Cadastrar</text>
+            }
+        </MudButton>
+    </MudForm>
+
+    <div class="d-flex justify-center mt-6">
+        <MudText Typo="Typo.body2" Style="color: #6b7280;">Já tem uma conta? <MudLink Href="/" Color="Color.Primary" Underline="Underline.None" Class="font-bold">Faça login</MudLink></MudText>
+    </div>
+</MudPaper>
+
+@code {
+    MudForm form;
+    bool success;
+    string[] errors = { };
+
+    private string nome = "";
+    private string email = "";
+    private string senha = "";
+    private bool isLoading;
+    private string errorMessage = "";
+
+    private async Task DoRegister()
+    {
+        await form.Validate();
+        if (form.IsValid)
+        {
+            isLoading = true;
+            errorMessage = "";
+            
+            var newUser = new Usuario
+            {
+                Nome = nome,
+                Email = email,
+                Senha = senha,
+                Tipo = "Nutricionista",
+                Ativo = true,
+                DataCriacao = DateTime.Now
+                // DataAtualizacao is null initially because the user has not edited anything yet
+            };
+
+            var result = await AuthService.RegisterAsync(newUser);
+            if (result)
+            {
+                // Após o cadastro, o próprio nutricionista pode ser redirecionado para o login
+                Navigation.NavigateTo("/");
+            }
+            else
+            {
+                errorMessage = "Ocorreu um erro ao criar a conta.";
+            }
+            
+            isLoading = false;
+        }
+    }
+}
