@@ -1,18 +1,40 @@
-﻿namespace NutriFlow.Models
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace NutriFlow.Models
 {
+    [Table("Sessoes")]
     public class Sessao
     {
+        [Key]
+        [Column("id")]
         public int Id { get; set; }
-        public int PacienteId { get; set; }
-        public DateTime Data { get; set; }
-        public TimeSpan Horario { get; set; }
-        public string Tipo { get; set; } = string.Empty; // consulta_inicial, retorno, avaliacao, online
-        public string Observacoes { get; set; } = string.Empty;
-        public string Status { get; set; } = "agendada"; // agendada, realizada, cancelada
-        public DateTime DataCriacao { get; set; }
-        public DateTime DataAtualizacao { get; set; }
+        
+        [Column("paciente_id")]
+        public int? PacienteId { get; set; }
+        
+        [ForeignKey(nameof(PacienteId))]
+        public Paciente? Paciente { get; set; }
 
-        // Propriedades de navegação
-        public virtual Paciente? Paciente { get; set; }
+        [Column("data_sessao")]
+        public DateTime? DataSessao { get; set; }
+        
+        [Column("tipo")]
+        public string? Tipo { get; set; }
+        
+        [Column("peso_sessao")]
+        public decimal? PesoSessao { get; set; }
+        
+        [Column("anotacoes")]
+        public string? Anotacoes { get; set; }
+        
+        [Column("proxima_consulta")]
+        public DateTime? ProximaConsulta { get; set; }
+        
+        [Column("data_criacao")]
+        public DateTime? DataCriacao { get; set; }
+        
+        [Column("data_atualizacao")]
+        public DateTime? DataAtualizacao { get; set; }
     }
 }
