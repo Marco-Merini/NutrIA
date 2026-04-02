@@ -1,4 +1,6 @@
 using NutriFlow.Models;
+using NutriFlow.Data;
+using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -6,13 +8,16 @@ namespace NutriFlow.Services
 {
     public class AuthService
     {
+        private readonly ApplicationDbContext _dbContext;
         private Usuario? _currentUser;
         private bool _isAuthenticated;
-        
-        // Mock storage para dev
-        private List<Usuario> _usuariosMock = new();
 
         public event Action? AuthStateChanged;
+
+        public AuthService(ApplicationDbContext dbContext)
+        {
+            _dbContext = dbContext;
+        }
 
         public bool IsAuthenticated
         {
@@ -31,6 +36,8 @@ namespace NutriFlow.Services
 
         public string GenerateHash(string input)
         {
+            if (string.IsNullOrEmpty(input)) return string.Empty;
+
             using (SHA256 sha256Hash = SHA256.Create())
             {
                 byte[] bytes = sha256Hash.ComputeHash(Encoding.UTF8.GetBytes(input));
@@ -45,47 +52,78 @@ namespace NutriFlow.Services
 
         public async Task<bool> RegisterAsync(Usuario newUser)
         {
-            await Task.Delay(500); // simulate network
-            
-            // Hash the password deterministic
-            newUser.Senha = GenerateHash(newUser.Senha);
-            newUser.Id = _usuariosMock.Count + 1;
-            
-            _usuariosMock.Add(newUser);
-            return true;
+            try
+            {
+                // Verificar se já existe (Nome ou Email duplicados) - opcional mas recomendado
+                var exists = await _dbContext.Usuarios.AnyAsync(u => u.Nome == newUser.Nome || u.Email == newUser.Email);
+                if (exists)
+                {
+                    return false; // Usuário já cadastrado
+                }
+
+                // Criptografar a senha permanentemente para salvar
+                newUser.Senha = GenerateHash(newUser.Senha);
+                
+                await _dbContext.Usuarios.AddAsync(newUser);
+                await _dbContext.SaveChangesAsync();
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erro ao criar conta: {ex.Message}");
+                return false;
+            }
+        }
+
+        public async Task<bool> UpdateUserAsync(Usuario updatedUser)
+        {
+            try
+            {
+                var user = await _dbContext.Usuarios.FindAsync(updatedUser.Id);
+                if (user == null) return false;
+
+                user.Nome = updatedUser.Nome;
+                user.Email = updatedUser.Email;
+                // Só modifica a senha se o usuário digitou uma nova
+                if (!string.IsNullOrEmpty(updatedUser.Senha) && updatedUser.Senha != user.Senha)
+                {
+                    user.Senha = GenerateHash(updatedUser.Senha);
+                }
+
+                // Preencher com o momento exato em que foi editado o cadastro
+                user.DataAtualizacao = DateTime.Now;
+                
+                _dbContext.Usuarios.Update(user);
+                await _dbContext.SaveChangesAsync();
+
+                if (_currentUser?.Id == user.Id)
+                {
+                    _currentUser = user;
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erro ao editar perfil: {ex.Message}");
+                return false;
+            }
         }
 
         public async Task<bool> LoginAsync(string nome, string senha)
         {
             try
             {
-                // Simular delay de rede
-                await Task.Delay(500);
-
+                // Calcula o hash exato da senha que a pessoa acabou de digitar
                 string hashedSenha = GenerateHash(senha);
 
-                // Find user
-                var user = _usuariosMock.FirstOrDefault(u => u.Nome == nome && u.Senha == hashedSenha);
+                // Busca o banco para ver se o hash bate com a conta
+                var user = await _dbContext.Usuarios.FirstOrDefaultAsync(u => u.Nome == nome && u.Senha == hashedSenha && u.Ativo == true);
 
                 if (user != null)
                 {
                     _currentUser = user;
-                    IsAuthenticated = true;
-                    return true;
-                }
-                
-                // Fallback for initial login before registration
-                if (_usuariosMock.Count == 0 && nome == "Nutricionista" && senha == "123")
-                {
-                    _currentUser = new Usuario
-                    {
-                        Id = 1,
-                        Nome = "Nutricionista",
-                        Email = "nutri@email.com",
-                        Tipo = "Nutricionista",
-                        Ativo = true,
-                        DataCriacao = DateTime.Now
-                    };
                     IsAuthenticated = true;
                     return true;
                 }
