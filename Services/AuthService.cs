@@ -1,6 +1,7 @@
 using NutriFlow.Models;
 using NutriFlow.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -9,14 +10,17 @@ namespace NutriFlow.Services
     public class AuthService
     {
         private readonly ApplicationDbContext _dbContext;
+        private readonly ProtectedLocalStorage _localStorage;
         private Usuario? _currentUser;
         private bool _isAuthenticated;
+        private bool _isInitialized;
 
         public event Action? AuthStateChanged;
 
-        public AuthService(ApplicationDbContext dbContext)
+        public AuthService(ApplicationDbContext dbContext, ProtectedLocalStorage localStorage)
         {
             _dbContext = dbContext;
+            _localStorage = localStorage;
         }
 
         public bool IsAuthenticated
@@ -33,6 +37,32 @@ namespace NutriFlow.Services
         }
 
         public Usuario? CurrentUser => _currentUser;
+
+        public async Task InitializeAsync()
+        {
+            if (_isInitialized) return;
+
+            try
+            {
+                var result = await _localStorage.GetAsync<int>("userId");
+                if (result.Success && result.Value > 0)
+                {
+                    _currentUser = await _dbContext.Usuarios.FindAsync(result.Value);
+                    if (_currentUser != null)
+                    {
+                        IsAuthenticated = true;
+                    }
+                }
+            }
+            catch
+            {
+                
+            }
+            finally
+            {
+                _isInitialized = true;
+            }
+        }
 
         public string GenerateHash(string input)
         {
@@ -54,14 +84,12 @@ namespace NutriFlow.Services
         {
             try
             {
-                // Verificar se já existe (Nome ou Email duplicados) - opcional mas recomendado
                 var exists = await _dbContext.Usuarios.AnyAsync(u => u.Nome == newUser.Nome || u.Email == newUser.Email);
                 if (exists)
                 {
-                    return false; // Usuário já cadastrado
+                    return false;
                 }
 
-                // Criptografar a senha permanentemente para salvar
                 newUser.Senha = GenerateHash(newUser.Senha);
                 
                 await _dbContext.Usuarios.AddAsync(newUser);
@@ -85,13 +113,11 @@ namespace NutriFlow.Services
 
                 user.Nome = updatedUser.Nome;
                 user.Email = updatedUser.Email;
-                // Só modifica a senha se o usuário digitou uma nova
                 if (!string.IsNullOrEmpty(updatedUser.Senha) && updatedUser.Senha != user.Senha)
                 {
                     user.Senha = GenerateHash(updatedUser.Senha);
                 }
 
-                // Preencher com o momento exato em que foi editado o cadastro
                 user.DataAtualizacao = DateTime.Now;
                 
                 _dbContext.Usuarios.Update(user);
@@ -115,16 +141,21 @@ namespace NutriFlow.Services
         {
             try
             {
-                // Calcula o hash exato da senha que a pessoa acabou de digitar
                 string hashedSenha = GenerateHash(senha);
-
-                // Busca o banco para ver se o hash bate com a conta
                 var user = await _dbContext.Usuarios.FirstOrDefaultAsync(u => u.Nome == nome && u.Senha == hashedSenha && u.Ativo == true);
 
                 if (user != null)
                 {
                     _currentUser = user;
                     IsAuthenticated = true;
+                    
+                    try 
+                    {
+                        await _localStorage.SetAsync("userId", user.Id);
+                    } 
+                    catch { 
+                    }
+                    
                     return true;
                 }
 
@@ -137,10 +168,17 @@ namespace NutriFlow.Services
             }
         }
 
-        public void Logout()
+        public async Task LogoutAsync()
         {
             _currentUser = null;
             IsAuthenticated = false;
+            _isInitialized = false;
+            
+            try
+            {
+                await _localStorage.DeleteAsync("userId");
+            }
+            catch { }
         }
     }
 }

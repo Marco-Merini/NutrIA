@@ -1,8 +1,28 @@
-<MudNavMenu Class="nutri-nav-menu mt-2">
-    <MudNavLink Href="/home" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
-    <MudNavLink Href="/pacientes" Icon="@Icons.Material.Filled.PeopleAlt">Pacientes</MudNavLink>
-    <MudNavLink Href="/planos" Icon="@Icons.Custom.Uncategorized.FoodApple">Planos Alimentares</MudNavLink>
-    <MudNavLink Href="/progresso" Icon="@Icons.Material.Filled.TrendingUp">Progresso</MudNavLink>
-    <MudNavLink Href="/sessoes" Icon="@Icons.Material.Filled.EventNote">Sessões</MudNavLink>
-    <MudNavLink Href="/ia" Icon="@Icons.Material.Filled.Psychology">Assistente IA</MudNavLink>
-</MudNavMenu>
+@rendermode InteractiveServer
+@inject NutriFlow.Services.AuthService AuthService
+@inject NavigationManager NavigationManager
+
+<div class="d-flex flex-column" style="height: calc(100vh - 100px);">
+    <MudNavMenu Class="nutri-nav-menu mt-2" Style="flex-grow: 1;">
+        <MudNavLink Href="/home" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
+        <MudNavLink Href="/pacientes" Icon="@Icons.Material.Filled.PeopleAlt">Pacientes</MudNavLink>
+        <MudNavLink Href="/planos" Icon="@Icons.Custom.Uncategorized.FoodApple">Planos Alimentares</MudNavLink>
+        <MudNavLink Href="/progresso" Icon="@Icons.Material.Filled.TrendingUp">Progresso</MudNavLink>
+        <MudNavLink Href="/sessoes" Icon="@Icons.Material.Filled.EventNote">Sessões</MudNavLink>
+        <MudNavLink Href="/ia" Icon="@Icons.Material.Filled.Psychology">Assistente IA</MudNavLink>
+    </MudNavMenu>
+
+    <div class="px-4 pb-4 mt-auto">
+        <MudButton Variant="Variant.Text" Color="Color.Error" StartIcon="@Icons.Material.Filled.Logout" FullWidth="true" Class="justify-start text-none py-2 font-bold" OnClick="LogoutAsync">
+            Sair
+        </MudButton>
+    </div>
+</div>
+
+@code {
+    private async Task LogoutAsync()
+    {
+        await AuthService.LogoutAsync();
+        NavigationManager.NavigateTo("/", forceLoad: true);
+    }
+}

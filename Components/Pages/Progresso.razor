@@ -1,4 +1,5 @@
 @page "/progresso"
+@inject ISnackbar Snackbar
 
 <PageTitle>Progresso - NutriAI</PageTitle>
 
@@ -68,7 +69,7 @@
 
     public List<ChartSeries> Series = new List<ChartSeries>()
     {
-        new ChartSeries() { Name = "Peso", Data = new double[] { 88, 72.5, 71.2, 70.1, 89 } } // Mock values
+        new ChartSeries() { Name = "Peso", Data = new double[] { 88, 72.5, 71.2, 70.1, 89 } }
     };
 
     public string[] XAxisLabels = { "2025-03-01", "2025-03-15", "2025-04-01", "2025-04-15" };

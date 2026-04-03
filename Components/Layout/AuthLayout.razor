@@ -1,9 +1,9 @@
 @inherits LayoutComponentBase
 
-<MudThemeProvider Theme="@_theme" />
-<MudDialogProvider />
-<MudSnackbarProvider />
-<MudPopoverProvider />
+<MudThemeProvider Theme="@_theme" @rendermode="InteractiveServer" />
+<MudDialogProvider @rendermode="InteractiveServer" />
+<MudSnackbarProvider @rendermode="InteractiveServer" />
+<MudPopoverProvider @rendermode="InteractiveServer" />
 
 <MudLayout>
     <MudMainContent Class="d-flex align-center justify-center" Style="background-color: #f5f6f8; min-height: 100vh;">
