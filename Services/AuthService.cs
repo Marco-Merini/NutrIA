@@ -56,7 +56,10 @@ namespace NutriFlow.Services
             }
             catch
             {
-                
+                // Falha ao acessar o LocalStorage.
+                // Isso pode acontecer durante o prerendering no Blazor Server
+                // ou quando o JavaScript interop ainda não está disponível.
+                // Nesse caso, a aplicação continua normalmente, apenas sem restaurar a sessão.
             }
             finally
             {
@@ -142,20 +145,26 @@ namespace NutriFlow.Services
             try
             {
                 string hashedSenha = GenerateHash(senha);
-                var user = await _dbContext.Usuarios.FirstOrDefaultAsync(u => u.Nome == nome && u.Senha == hashedSenha && u.Ativo == true);
+                var user = await _dbContext.Usuarios.FirstOrDefaultAsync(
+                    u => u.Nome == nome && u.Senha == hashedSenha && u.Ativo == true
+                );
 
                 if (user != null)
                 {
                     _currentUser = user;
                     IsAuthenticated = true;
-                    
-                    try 
+
+                    try
                     {
                         await _localStorage.SetAsync("userId", user.Id);
-                    } 
-                    catch { 
                     }
-                    
+                    catch
+                    {
+                        // Falha ao salvar o userId no LocalStorage.
+                        // O usuário continuará autenticado na sessão atual,
+                        // mas o login não será mantido após recarregar a página.
+                    }
+
                     return true;
                 }
 
@@ -173,12 +182,17 @@ namespace NutriFlow.Services
             _currentUser = null;
             IsAuthenticated = false;
             _isInitialized = false;
-            
+
             try
             {
                 await _localStorage.DeleteAsync("userId");
             }
-            catch { }
+            catch
+            {
+                // Falha ao remover o userId do LocalStorage.
+                // Isso não impede o logout em memória,
+                // mas pode fazer com que a sessão antiga permaneça salva no navegador.
+            }
         }
     }
 }
