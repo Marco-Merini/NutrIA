@@ -1,5 +1,13 @@
 @page "/pacientes"
-
+@rendermode InteractiveServer
+@using NutriFlow.Data
+@using NutriFlow.Models
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject IDialogService DialogService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+@inject NutriFlow.Services.AuthService AuthService
 <PageTitle>Pacientes - NutriAI</PageTitle>
 
 <div class="d-flex justify-space-between align-center mb-6">
@@ -7,7 +15,7 @@
         <MudText Typo="Typo.h5" Class="font-bold">Pacientes</MudText>
         <MudText Typo="Typo.body2" Style="color: #6b7280;">Gerencie os perfis dos seus pacientes</MudText>
     </div>
-    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Class="rounded-lg text-none px-4">
+    <MudButton Href="/pacientes/novo" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Class="rounded-lg text-none px-4">
         Novo Paciente
     </MudButton>
 </div>
@@ -21,47 +29,110 @@
 
 <!-- Patient List -->
 <div class="d-flex flex-column gap-4">
-    @foreach (var p in pacientes)
+    @if (FilteredPacientes.Any())
     {
-        <MudPaper Class="nutri-card pa-4 d-flex justify-space-between align-center" Elevation="0">
-            <div class="d-flex align-center gap-4">
-                <div class="avatar-initials" style="width: 48px; height: 48px; font-size: 1.1rem;">
-                    @p.Nome.Substring(0, 1).ToUpper()
-                </div>
-                <div>
-                    <MudText Typo="Typo.subtitle1" Class="font-bold">@p.Nome</MudText>
-                    <div class="d-flex align-center gap-3 mt-1">
-                        <span class="status-badge" style="background-color: #e5f9f0; color: #2bd07b;">@p.Objetivo</span>
-                        <MudText Typo="Typo.caption" Style="color: #6b7280;">@p.PesoAtual kg</MudText>
-                        <MudText Typo="Typo.caption" Style="color: #6b7280;">@p.Email</MudText>
+        @foreach (var p in FilteredPacientes)
+        {
+            <MudPaper Class="nutri-card pa-4 d-flex justify-space-between align-center" Elevation="0">
+                <div class="d-flex align-center gap-4">
+                    <div class="avatar-initials" style="width: 48px; height: 48px; font-size: 1.1rem;">
+                        @(string.IsNullOrEmpty(p.Nome) ? "?" : p.Nome.Substring(0, 1).ToUpper())
+                    </div>
+                    <div>
+                        <MudText Typo="Typo.subtitle1" Class="font-bold">@p.Nome</MudText>
+                        <div class="d-flex align-center gap-3 mt-1">
+                            <span class="status-badge" style="background-color: #e5f9f0; color: #2bd07b;">@(string.IsNullOrEmpty(p.Objetivo) ? "Sem Objetivo" : p.Objetivo)</span>
+                            <MudText Typo="Typo.caption" Style="color: #6b7280;">@(p.PesoAtual?.ToString("0.##") ?? "0") kg</MudText>
+                            <MudText Typo="Typo.caption" Style="color: #6b7280;">@p.Email</MudText>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="d-flex align-center gap-4">
-                <span class="status-badge ativo">ativo</span>
-                <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" Style="color: #a0aabf;" />
-                <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Size="Size.Small" Color="Color.Error" />
-            </div>
-        </MudPaper>
+                <div class="d-flex align-center gap-4">
+                    <span class="status-badge ativo">ativo</span>
+                    <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" Style="color: #a0aabf;" Href="@($"/pacientes/{p.Id}")" />
+                    <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Size="Size.Small" Color="Color.Error" OnClick="@(() => ConfirmarDelecao(p))" />
+                </div>
+            </MudPaper>
+        }
+    }
+    else
+    {
+        <MudText Align="Align.Center" Class="py-4" Style="color:#6b7280">Nenhum paciente cadastrado ou encontrado.</MudText>
     }
 </div>
 
 @code {
     private string searchTerm = "";
+    private List<Paciente> pacientes = new();
 
-    private List<PacienteViewModel> pacientes = new()
-    {
-        new() { Nome = "Ana Paula Ferreira", Objetivo = "Perda de Peso", PesoAtual = 72.5m, Email = "ana.ferreira@email.com", Status = "ativo" },
-        new() { Nome = "Carlos Eduardo Silva", Objetivo = "Ganho de Massa", PesoAtual = 88m, Email = "carlos.silva@email.com", Status = "ativo" },
-        new() { Nome = "Mariana Costa", Objetivo = "Saúde Geral", PesoAtual = 58m, Email = "mariana.costa@email.com", Status = "ativo" }
-    };
+    private IEnumerable<Paciente> FilteredPacientes => string.IsNullOrWhiteSpace(searchTerm)
+        ? pacientes
+        : pacientes.Where(p => (p.Nome?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) || 
+                               (p.Email?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false));
 
-    public class PacienteViewModel
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        public string Nome { get; set; } = "";
-        public string Objetivo { get; set; } = "";
-        public decimal PesoAtual { get; set; }
-        public string Email { get; set; } = "";
-        public string Status { get; set; } = "";
+        if (firstRender)
+        {
+            await AuthService.InitializeAsync();
+            await LoadPacientes();
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadPacientes()
+    {
+        try 
+        {
+            if (AuthService.CurrentUser != null)
+            {
+                var userId = AuthService.CurrentUser.Id;
+                pacientes = await DbContext.Pacientes
+                    .Where(p => p.UsuarioId == userId)
+                    .ToListAsync();
+
+                if (!pacientes.Any())
+                {
+                    var totalPacientesDb = await DbContext.Pacientes.CountAsync();
+                    if (totalPacientesDb > 0)
+                    {
+                        Snackbar.Add($"O banco tem {totalPacientesDb} pacientes, mas nenhum está vinculado ao seu usuário (ID: {userId}).", Severity.Warning);
+                    }
+                }
+            }
+            else
+            {
+                NavigationManager.NavigateTo("/");
+            }
+        }
+        catch 
+        {
+            Snackbar.Add("Erro ao carregar pacientes do banco de dados.", Severity.Error);
+        }
+    }
+
+    private async Task ConfirmarDelecao(Paciente paciente)
+    {
+        bool? result = await DialogService.ShowMessageBox(
+            "Excluir Paciente", 
+            $"Tem certeza que deseja deletar o paciente {paciente.Nome}? Esta ação não pode ser desfeita e todas as informações serão perdidas.", 
+            yesText: "Sim, Excluir", cancelText: "Cancelar");
+            
+        if (result == true)
+        {
+            try
+            {
+                DbContext.Pacientes.Remove(paciente);
+                await DbContext.SaveChangesAsync();
+                
+                pacientes.Remove(paciente);
+                Snackbar.Add("Paciente deletado com sucesso.", Severity.Success);
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao deletar paciente: {ex.Message}", Severity.Error);
+            }
+        }
     }
 }

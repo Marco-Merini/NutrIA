@@ -1,0 +1,258 @@
+@page "/pacientes/{Id:int}"
+@rendermode InteractiveServer
+@using NutriFlow.Data
+@using NutriFlow.Models
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject NavigationManager NavigationManager
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>@Title - NutriAI</PageTitle>
+
+@if (IsLoading)
+{
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" Class="d-block mx-auto mt-16" />
+}
+else if (Paciente == null)
+{
+    <MudText Align="Align.Center" Class="mt-16 text-muted">Paciente não encontrado.</MudText>
+    <div class="text-center mt-4">
+        <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" OnClick="Voltar">
+            Voltar para Pacientes
+        </MudButton>
+    </div>
+}
+else
+{
+    <!-- Header -->
+    <div class="mb-4">
+        <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" OnClick="Voltar" Class="text-muted text-none px-0 pb-2">
+            Voltar para Pacientes
+        </MudButton>
+        <div class="d-flex justify-space-between align-center mt-2">
+            <div class="d-flex align-center gap-4">
+                <MudAvatar Color="Color.Info" Variant="Variant.Filled" Style="width: 56px; height: 56px; font-size: 1.5rem; background-color: #e5f9f0 !important; color: #2bd07b !important;">
+                    @(string.IsNullOrEmpty(Paciente.Nome) ? "?" : Paciente.Nome[..1].ToUpper())
+                </MudAvatar>
+                <div>
+                    <MudText Typo="Typo.h5" Class="font-bold">@Paciente.Nome</MudText>
+                    <div class="d-flex gap-2 align-center mt-1">
+                        <span class="status-badge" style="background-color: #e5f9f0; color: #2bd07b; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 500;">
+                            @Paciente.Status?.ToLower()
+                        </span>
+                        <MudText Typo="Typo.caption" Class="text-muted">
+                            @(string.IsNullOrEmpty(Paciente.Objetivo) ? "Geral" : Paciente.Objetivo)
+                        </MudText>
+                    </div>
+                </div>
+            </div>
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Edit" Class="rounded-lg text-none px-6 bg-white" Style="border-color: #e2e8f0; color: #475569; font-weight: 500;" >
+                Editar
+            </MudButton>
+        </div>
+    </div>
+
+    <MudGrid Spacing="4">
+        <!-- Left Column -->
+        <MudItem xs="12" md="8">
+            <!-- Dados Físicos -->
+            <MudPaper Class="nutri-card pa-6 mb-6" Elevation="0" Style="border: 1px solid #f1f5f9; border-radius: 12px;">
+                <MudText Typo="Typo.h6" Class="font-bold mb-4">Dados Físicos</MudText>
+                <MudGrid Spacing="4">
+                    <MudItem xs="4">
+                        <div class="pa-4 rounded bg-light text-center" style="background-color: #f8fafc;">
+                            <MudText Typo="Typo.h5" Class="font-bold">@(Paciente.PesoAtual?.ToString("0.##") ?? "-")</MudText>
+                            <MudText Typo="Typo.caption" Class="text-muted">kg</MudText>
+                        </div>
+                    </MudItem>
+                    <MudItem xs="4">
+                        <div class="pa-4 rounded bg-light text-center" style="background-color: #f8fafc;">
+                            <MudText Typo="Typo.h5" Class="font-bold">@(Paciente.Altura?.ToString("0.##") ?? "-")</MudText>
+                            <MudText Typo="Typo.caption" Class="text-muted">cm</MudText>
+                        </div>
+                    </MudItem>
+                    <MudItem xs="4">
+                        <div class="pa-4 rounded bg-light text-center" style="background-color: #f8fafc;">
+                            <MudText Typo="Typo.h5" Class="font-bold">@CalcularIMC()</MudText>
+                            <MudText Typo="Typo.caption" Class="text-muted">IMC</MudText>
+                        </div>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+
+            <!-- Informações Pessoais -->
+            <MudPaper Class="nutri-card pa-6" Elevation="0" Style="border: 1px solid #f1f5f9; border-radius: 12px;">
+                <MudText Typo="Typo.h6" Class="font-bold mb-4">Informações Pessoais</MudText>
+                <MudGrid Spacing="3">
+                    <MudItem xs="12" sm="6">
+                        <MudText Typo="Typo.caption" Class="text-muted text-uppercase" Style="letter-spacing: 0.5px; font-weight: 600;">E-mail</MudText>
+                        <MudText Typo="Typo.body2" Class="mt-1" Style="color: #334155;">@(string.IsNullOrEmpty(Paciente.Email) ? "-" : Paciente.Email)</MudText>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudText Typo="Typo.caption" Class="text-muted text-uppercase" Style="letter-spacing: 0.5px; font-weight: 600;">Telefone</MudText>
+                        <MudText Typo="Typo.body2" Class="mt-1" Style="color: #334155;">@(string.IsNullOrEmpty(Paciente.Telefone) ? "-" : Paciente.Telefone)</MudText>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudText Typo="Typo.caption" Class="text-muted text-uppercase" Style="letter-spacing: 0.5px; font-weight: 600;">Data de Nascimento</MudText>
+                        <MudText Typo="Typo.body2" Class="mt-1" Style="color: #334155;">@(Paciente.DataNascimento?.ToString("yyyy-MM-dd") ?? "-")</MudText>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudText Typo="Typo.caption" Class="text-muted text-uppercase" Style="letter-spacing: 0.5px; font-weight: 600;">Sexo</MudText>
+                        <MudText Typo="Typo.body2" Class="mt-1" Style="color: #334155;">@(string.IsNullOrEmpty(Paciente.Sexo) ? "-" : Paciente.Sexo)</MudText>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudText Typo="Typo.caption" Class="text-muted text-uppercase" Style="letter-spacing: 0.5px; font-weight: 600;">Nível de Atividade</MudText>
+                        <MudText Typo="Typo.body2" Class="mt-1" Style="color: #334155;">@(string.IsNullOrEmpty(Paciente.NivelAtividade) ? "-" : Paciente.NivelAtividade)</MudText>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudText Typo="Typo.caption" Class="text-muted text-uppercase" Style="letter-spacing: 0.5px; font-weight: 600;">Medicamentos</MudText>
+                        <MudText Typo="Typo.body2" Class="mt-1" Style="color: #334155;">@(string.IsNullOrEmpty(Paciente.Medicamentos) ? "-" : Paciente.Medicamentos)</MudText>
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.caption" Class="text-muted text-uppercase" Style="letter-spacing: 0.5px; font-weight: 600;">Preferências Alimentares</MudText>
+                        <MudText Typo="Typo.body2" Class="mt-1" Style="color: #334155;">@(string.IsNullOrEmpty(Paciente.PreferenciasAlimentares) ? "-" : Paciente.PreferenciasAlimentares)</MudText>
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.caption" Class="text-muted text-uppercase" Style="letter-spacing: 0.5px; font-weight: 600;">Condições de Saúde</MudText>
+                        <MudText Typo="Typo.body2" Class="mt-1" Style="color: #334155;">@(string.IsNullOrEmpty(Paciente.CondicoesSaude) ? "-" : Paciente.CondicoesSaude)</MudText>
+                    </MudItem>
+                    
+                    @if (!string.IsNullOrEmpty(Paciente.Observacoes))
+                    {
+                        <MudItem xs="12">
+                            <MudText Typo="Typo.caption" Class="text-muted text-uppercase" Style="letter-spacing: 0.5px; font-weight: 600;">Observações Adicionais</MudText>
+                            <MudText Typo="Typo.body2" Class="mt-1" Style="color: #334155;">@Paciente.Observacoes</MudText>
+                        </MudItem>
+                    }
+                </MudGrid>
+            </MudPaper>
+        </MudItem>
+
+        <!-- Right Column -->
+        <MudItem xs="12" md="4" Class="d-flex flex-column gap-6">
+            <!-- Planos -->
+            <MudPaper Class="nutri-card pa-6" Elevation="0" Style="border: 1px solid #f1f5f9; border-radius: 12px;">
+                <div class="d-flex justify-space-between align-center mb-4">
+                    <div class="d-flex align-center gap-2">
+                        <MudIcon Icon="@Icons.Material.Outlined.RestaurantMenu" Size="Size.Small" Style="color: #475569;" />
+                        <MudText Typo="Typo.subtitle1" Class="font-bold">Planos</MudText>
+                    </div>
+                    <MudLink Href="/planos" Typo="Typo.caption" Class="font-bold pointer" Style="color: #2bd07b;" Underline="Underline.None">Ver todos</MudLink>
+                </div>
+
+                <div class="d-flex flex-column gap-3">
+                    @if (Paciente.PlanosDieta != null && Paciente.PlanosDieta.Any())
+                    {
+                        @foreach(var plano in Paciente.PlanosDieta.Take(3))
+                        {
+                            <div class="pa-3 rounded bg-light" style="background-color: #f8fafc;">
+                                <MudText Typo="Typo.body2" Class="font-bold d-block">
+                                    @(string.IsNullOrEmpty(plano.Titulo) ? "Plano Sem Título" : plano.Titulo)
+                                </MudText>
+                                <MudText Typo="Typo.caption" Class="text-muted">
+                                    @(plano.CaloriasDiarias?.ToString() ?? "-") kcal · @(plano.Status ?? "ativo")
+                                </MudText>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="pa-4 rounded bg-light text-center" style="background-color: #f8fafc;">
+                            <MudText Typo="Typo.caption" Class="text-muted">Nenhum plano cadastrado.</MudText>
+                        </div>
+                    }
+                </div>
+            </MudPaper>
+
+            <!-- Progresso -->
+            <MudPaper Class="nutri-card pa-6" Elevation="0" Style="border: 1px solid #f1f5f9; border-radius: 12px;">
+               <div class="d-flex justify-space-between align-center mb-4">
+                    <div class="d-flex align-center gap-2">
+                        <MudIcon Icon="@Icons.Material.Outlined.Timeline" Size="Size.Small" Style="color: #475569;" />
+                        <MudText Typo="Typo.subtitle1" Class="font-bold">Progresso</MudText>
+                    </div>
+                    <MudLink Href="/progresso" Typo="Typo.caption" Class="font-bold pointer" Style="color: #2bd07b;" Underline="Underline.None">Ver todos</MudLink>
+                </div>
+
+                <div class="d-flex flex-column gap-3">
+                    @if (Paciente.Progressos != null && Paciente.Progressos.Any())
+                    {
+                        @foreach(var progresso in Paciente.Progressos.OrderByDescending(p => p.DataRegistro).Take(3))
+                        {
+                            <div class="pa-3 rounded bg-light" style="background-color: #f8fafc;">
+                                <MudText Typo="Typo.body2" Class="font-bold d-block">
+                                    @(progresso.DataRegistro?.ToString("yyyy-MM-dd") ?? "Data indefinida")
+                                </MudText>
+                                <MudText Typo="Typo.caption" Class="text-muted">
+                                    @(progresso.Peso?.ToString("0.##") ?? "-") kg · @(progresso.Humor ?? "-")
+                                </MudText>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="pa-4 rounded bg-light text-center" style="background-color: #f8fafc;">
+                            <MudText Typo="Typo.caption" Class="text-muted">Nenhum progresso registrado.</MudText>
+                        </div>
+                    }
+                </div>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private Paciente? Paciente { get; set; }
+    private bool IsLoading { get; set; } = true;
+    
+    private string Title => Paciente?.Nome ?? "Carregando...";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        IsLoading = true;
+        try 
+        {
+            Paciente = await DbContext.Pacientes
+                .Include(p => p.PlanosDieta)
+                .Include(p => p.Progressos)
+                .FirstOrDefaultAsync(p => p.Id == Id);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro ao carregar detalhes: {ex.Message}");
+            Snackbar.Add("Erro ao carregar os dados do paciente.", Severity.Error);
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void Voltar()
+    {
+        NavigationManager.NavigateTo("/pacientes");
+    }
+
+    private string CalcularIMC()
+    {
+        if (Paciente?.PesoAtual == null || Paciente?.Altura == null || Paciente.Altura <= 0)
+            return "-";
+
+        var peso = Paciente.PesoAtual.Value;
+        
+        var alturaM = Paciente.Altura.Value > 3 ? Paciente.Altura.Value / 100 : Paciente.Altura.Value;
+        
+        if (alturaM <= 0) return "-";
+
+        var imc = peso / (alturaM * alturaM);
+        return Math.Round(imc, 1).ToString();
+    }
+}

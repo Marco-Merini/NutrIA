@@ -1,9 +1,9 @@
 @inherits LayoutComponentBase
 
-<MudThemeProvider Theme="@_theme" />
-<MudDialogProvider />
-<MudSnackbarProvider />
-<MudPopoverProvider />
+<MudThemeProvider Theme="@_theme" @rendermode="InteractiveServer" />
+<MudDialogProvider @rendermode="InteractiveServer" />
+<MudSnackbarProvider @rendermode="InteractiveServer" />
+<MudPopoverProvider @rendermode="InteractiveServer" />
 
 <MudLayout>
     <MudDrawer Open="true" Elevation="0" Variant="DrawerVariant.Persistent" Width="260px" Class="nutri-drawer">

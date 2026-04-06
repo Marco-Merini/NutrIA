@@ -1,8 +1,9 @@
-using NutriFlow.Services;
+using Microsoft.EntityFrameworkCore;
+using MudBlazor;
 using MudBlazor.Services;
 using NutriFlow.Components;
-using Microsoft.EntityFrameworkCore;
 using NutriFlow.Data;
+using NutriFlow.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,15 +11,23 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-builder.Services.AddMudServices();
+builder.Services.AddMudServices(config =>
+{
+    config.SnackbarConfiguration.PositionClass = Defaults.Classes.Position.TopCenter;
+    config.SnackbarConfiguration.RequireInteraction = false;
+    config.SnackbarConfiguration.PreventDuplicates = true;
+    config.SnackbarConfiguration.NewestOnTop = false;
+    config.SnackbarConfiguration.ShowCloseIcon = false;
+    config.SnackbarConfiguration.VisibleStateDuration = 2000;
+    config.SnackbarConfiguration.HideTransitionDuration = 500;
+    config.SnackbarConfiguration.ShowTransitionDuration = 500;
+    config.SnackbarConfiguration.SnackbarVariant = Variant.Outlined;
+});
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(connectionString));
 
-// Register application services
-// Typed HttpClient for ApiService will be provided by IHttpClientFactory
-builder.Services.AddHttpClient<ApiService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<NavigationService>();
 

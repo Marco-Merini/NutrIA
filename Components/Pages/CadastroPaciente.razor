@@ -1,0 +1,150 @@
+@page "/pacientes/novo"
+@rendermode InteractiveServer
+@using NutriFlow.Data
+@using NutriFlow.Models
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+@inject NutriFlow.Services.AuthService AuthService
+
+<PageTitle>Novo Paciente - NutriAI</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-6">
+    <div>
+        <MudText Typo="Typo.h5" Class="font-bold">Novo Paciente</MudText>
+        <MudText Typo="Typo.body2" Style="color: #6b7280;">Preencha os dados abaixo para cadastrar um novo paciente</MudText>
+    </div>
+    <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.ArrowBack" Class="rounded-lg text-none px-4" Href="/pacientes">
+        Voltar
+    </MudButton>
+</div>
+
+<MudPaper Class="pa-6" Elevation="0" Style="border: 1px solid #e2e8f0; border-radius: 8px;">
+    <MudForm @ref="form" @bind-IsValid="success">
+        <MudGrid>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="PacienteModel.Nome" Label="Nome Completo *" Required="true" RequiredError="O nome é obrigatório" Placeholder="Ex: Maria Silva" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </MudItem>
+
+            <MudItem xs="12" sm="6">
+                <MudDatePicker @bind-Date="PacienteModel.DataNascimento" Label="Data de Nascimento" Placeholder="dd/MM/yyyy" Variant="Variant.Outlined" Margin="Margin.Dense" DateFormat="dd/MM/yyyy" />
+            </MudItem>
+
+            <MudItem xs="12" sm="6">
+                <MudSelect T="string" @bind-Value="PacienteModel.Sexo" Label="Sexo" Placeholder="Selecionar" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    <MudSelectItem Value="@("Feminino")">Feminino</MudSelectItem>
+                    <MudSelectItem Value="@("Masculino")">Masculino</MudSelectItem>
+                    <MudSelectItem Value="@("Outro")">Outro</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="PacienteModel.Email" Label="E-mail" InputType="InputType.Email" Placeholder="email@exemplo.com" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </MudItem>
+
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="PacienteModel.Telefone" Label="Telefone" Placeholder="(00) 00000-0000" Variant="Variant.Outlined" Margin="Margin.Dense" Mask="@(new PatternMask("(00) 00000-0000"))" />
+            </MudItem>
+
+            <MudItem xs="12" sm="6">
+                <MudNumericField T="decimal?" @bind-Value="PacienteModel.PesoAtual" Label="Peso Atual (kg)" Placeholder="70,5" Variant="Variant.Outlined" Margin="Margin.Dense" Step="0.1M" />
+            </MudItem>
+
+            <MudItem xs="12" sm="6">
+                <MudNumericField T="decimal?" @bind-Value="PacienteModel.Altura" Label="Altura (cm)" Placeholder="175" Variant="Variant.Outlined" Margin="Margin.Dense" Step="1M" />
+            </MudItem>
+
+            <MudItem xs="12" sm="6">
+                <MudSelect T="string" @bind-Value="PacienteModel.Objetivo" Label="Objetivo" Placeholder="Selecionar objetivo" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    <MudSelectItem Value="@("Emagrecimento")">Emagrecimento</MudSelectItem>
+                    <MudSelectItem Value="@("Hipertrofia")">Hipertrofia</MudSelectItem>
+                    <MudSelectItem Value="@("Manutenção")">Manutenção</MudSelectItem>
+                    <MudSelectItem Value="@("Reeducação Alimentar")">Reeducação Alimentar</MudSelectItem>
+                    <MudSelectItem Value="@("Saúde / Qualidade de vida")">Saúde / Qualidade de vida</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="12" sm="6">
+                <MudSelect T="string" @bind-Value="PacienteModel.NivelAtividade" Label="Nível de Atividade" Placeholder="Selecionar nível" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    <MudSelectItem Value="@("Sedentário")">Sedentário</MudSelectItem>
+                    <MudSelectItem Value="@("Leve")">Leve (1-2 dias/semana)</MudSelectItem>
+                    <MudSelectItem Value="@("Moderado")">Moderado (3-5 dias/semana)</MudSelectItem>
+                    <MudSelectItem Value="@("Intenso")">Intenso (6-7 dias/semana)</MudSelectItem>
+                    <MudSelectItem Value="@("Muito Intenso")">Muito Intenso (Atleta)</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudTextField @bind-Value="PacienteModel.PreferenciasAlimentares" Label="Preferências Alimentares / Restrições" Lines="2" Placeholder="Ex: vegetariano, não gosta de peixe..." Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudTextField @bind-Value="PacienteModel.CondicoesSaude" Label="Condições de Saúde" Lines="2" Placeholder="Ex: diabetes tipo 2, hipertensão..." Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudTextField @bind-Value="PacienteModel.Medicamentos" Label="Medicamentos em Uso" Placeholder="Listar medicamentos" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudTextField @bind-Value="PacienteModel.Observacoes" Label="Observações Adicionais" Lines="3" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </MudItem>
+        </MudGrid>
+
+        <div class="d-flex justify-end gap-4 mt-6">
+            <MudButton Href="/pacientes" Variant="Variant.Outlined">Cancelar</MudButton>
+            <MudButton OnClick="Submeter" Color="Color.Success" Variant="Variant.Filled" Class="px-6">Cadastrar</MudButton>
+        </div>
+    </MudForm>
+</MudPaper>
+
+@code {
+    private MudForm form = null!;
+    private bool success;
+
+    public Paciente PacienteModel { get; set; } = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await AuthService.InitializeAsync();
+            if (AuthService.CurrentUser == null)
+            {
+                NavigationManager.NavigateTo("/");
+                return;
+            }
+            
+            StateHasChanged();
+        }
+    }
+
+    private async Task Submeter()
+    {
+        await form.Validate();
+
+        if (success)
+        {
+            try
+            {
+                if (AuthService.CurrentUser != null)
+                {
+                    PacienteModel.UsuarioId = AuthService.CurrentUser.Id;
+                    PacienteModel.DataCadastro = DateTime.UtcNow;
+                    PacienteModel.Status = "ativo";
+
+                    DbContext.Pacientes.Add(PacienteModel);
+                    await DbContext.SaveChangesAsync();
+
+                    Snackbar.Add("Paciente cadastrado com sucesso!", Severity.Success);
+                    NavigationManager.NavigateTo("/pacientes");
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao cadastrar paciente: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}

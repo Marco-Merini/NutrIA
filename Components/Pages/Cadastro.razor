@@ -1,7 +1,9 @@
 @page "/cadastro"
+@rendermode InteractiveServer
 @layout NutriFlow.Components.Layout.AuthLayout
 @inject NavigationManager Navigation
 @inject NutriFlow.Services.AuthService AuthService
+@inject ISnackbar Snackbar
 @using NutriFlow.Models
 
 <PageTitle>Cadastro - NutriAI</PageTitle>
@@ -13,11 +15,6 @@
     
     <MudText Typo="Typo.h5" Align="Align.Center" Class="mb-1 font-bold">Criar Conta</MudText>
     <MudText Typo="Typo.body2" Align="Align.Center" Style="color: #6b7280;" Class="mb-6">Preencha seus dados para se cadastrar como nutricionista</MudText>
-
-    @if (!string.IsNullOrEmpty(errorMessage))
-    {
-        <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
-    }
 
     <MudForm @ref="form" @bind-IsValid="@success" @bind-Errors="@errors">
         <MudTextField T="string" @bind-Value="nome" Label="Nome" InputType="InputType.Text" Required="true" RequiredError="O nome é obrigatório" Variant="Variant.Outlined" Class="mb-4 bg-white" />
@@ -51,7 +48,6 @@
     private string email = "";
     private string senha = "";
     private bool isLoading;
-    private string errorMessage = "";
 
     private async Task DoRegister()
     {
@@ -59,7 +55,6 @@
         if (form.IsValid)
         {
             isLoading = true;
-            errorMessage = "";
             
             var newUser = new Usuario
             {
@@ -68,19 +63,19 @@
                 Senha = senha,
                 Tipo = "Nutricionista",
                 Ativo = true,
-                DataCriacao = DateTime.Now
-                // DataAtualizacao is null initially because the user has not edited anything yet
+                DataCriacao = DateTime.Now,
+                DataAtualizacao = null
             };
 
             var result = await AuthService.RegisterAsync(newUser);
             if (result)
             {
-                // Após o cadastro, o próprio nutricionista pode ser redirecionado para o login
+                Snackbar.Add("Cadastro realizado com sucesso!", Severity.Success);
                 Navigation.NavigateTo("/");
             }
             else
             {
-                errorMessage = "Ocorreu um erro ao criar a conta.";
+                Snackbar.Add("Ocorreu um erro ao criar a conta.", Severity.Error);
             }
             
             isLoading = false;
