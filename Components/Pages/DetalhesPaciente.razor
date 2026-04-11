@@ -47,7 +47,7 @@ else
                     </div>
                 </div>
             </div>
-            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Edit" Class="rounded-lg text-none px-6 bg-white" Style="border-color: #e2e8f0; color: #475569; font-weight: 500;" >
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Edit" Class="rounded-lg text-none px-6 bg-white" Style="border-color: #e2e8f0; color: #475569; font-weight: 500;" OnClick="@(() => NavigationManager.NavigateTo($"/pacientes/{Id}/editar"))">
                 Editar
             </MudButton>
         </div>

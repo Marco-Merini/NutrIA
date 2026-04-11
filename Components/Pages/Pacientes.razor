@@ -90,15 +90,6 @@
                 pacientes = await DbContext.Pacientes
                     .Where(p => p.UsuarioId == userId)
                     .ToListAsync();
-
-                if (!pacientes.Any())
-                {
-                    var totalPacientesDb = await DbContext.Pacientes.CountAsync();
-                    if (totalPacientesDb > 0)
-                    {
-                        Snackbar.Add($"O banco tem {totalPacientesDb} pacientes, mas nenhum está vinculado ao seu usuário (ID: {userId}).", Severity.Warning);
-                    }
-                }
             }
             else
             {
