@@ -131,7 +131,7 @@
                 if (AuthService.CurrentUser != null)
                 {
                     PacienteModel.UsuarioId = AuthService.CurrentUser.Id;
-                    PacienteModel.DataCadastro = DateTime.UtcNow;
+                    PacienteModel.DataCadastro = DateTime.Now;
                     PacienteModel.Status = "ativo";
 
                     DbContext.Pacientes.Add(PacienteModel);
