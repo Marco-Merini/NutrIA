@@ -1,0 +1,356 @@
+@page "/planos/novo"
+@rendermode InteractiveServer
+@using NutriFlow.Data
+@using NutriFlow.Models
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+@inject NutriFlow.Services.AuthService AuthService
+@inject NutriFlow.Services.AIService AIService
+
+<PageTitle>Novo Plano Alimentar - NutriAI</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-6">
+    <div>
+        <MudText Typo="Typo.h5" Class="font-bold">Novo Plano Alimentar</MudText>
+        <MudText Typo="Typo.body2" Style="color: #6b7280;">Crie um plano alimentar personalizado para seu paciente</MudText>
+    </div>
+    <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.ArrowBack" Class="rounded-lg text-none px-4" OnClick="Cancelar">
+        Voltar
+    </MudButton>
+</div>
+
+<MudPaper Class="pa-6" Elevation="0" Style="border: 1px solid #e2e8f0; border-radius: 8px;">
+    <MudForm @ref="form" @bind-IsValid="success">
+        <MudGrid Spacing="4">
+
+            @* ── Paciente ── *@
+            <MudItem xs="12">
+                <MudSelect T="int?" @bind-Value="PlanoModel.PacienteId" Label="Paciente *" Placeholder="Selecione o paciente"
+                           Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" RequiredError="Selecione um paciente">
+                    @foreach (var p in Pacientes)
+                    {
+                        <MudSelectItem T="int?" Value="@p.Id">@p.Nome</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+
+            @* ── Gerar com IA ── *@
+            <MudItem xs="12">
+                <MudPaper Class="pa-4 rounded-lg" Elevation="0"
+                          Style="background: linear-gradient(135deg, #f3e8ff 0%, #ede9fe 50%, #e8f0fe 100%); border: 1px solid #d8b4fe;">
+                    <MudText Typo="Typo.subtitle1" Class="font-bold" Style="color: #6b21a8;">
+                        Gerar plano com Inteligência Artificial
+                    </MudText>
+                    <MudText Typo="Typo.body2" Style="color: #7c3aed;" Class="mb-3">
+                        A IA analisará o perfil completo do paciente e criará um plano personalizado automaticamente.
+                    </MudText>
+                    <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.AutoAwesome" Class="rounded-lg text-none px-4"
+                               Style="background-color: #8b5cf6; color: white;" Disabled="@(PlanoModel.PacienteId == null || IsGeneratingIA)"
+                               OnClick="GerarComIA">
+                        @if (IsGeneratingIA)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" style="color: white;" />
+                            <span>Gerando...</span>
+                        }
+                        else
+                        {
+                            <span>Gerar com IA</span>
+                        }
+                    </MudButton>
+                </MudPaper>
+            </MudItem>
+
+            @* ── Título ── *@
+            <MudItem xs="12">
+                <MudTextField @bind-Value="PlanoModel.Titulo" Label="Título do Plano *" Required="true"
+                              RequiredError="O título é obrigatório"
+                              Placeholder="Ex: Plano Hipocalórico - Janeiro 2025"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </MudItem>
+
+            @* ── Objetivo ── *@
+            <MudItem xs="12">
+                <MudTextField @bind-Value="PlanoModel.Objetivo" Label="Objetivo"
+                              Placeholder="Ex: Redução de 4kg em 2 meses"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </MudItem>
+
+            @* ── Calorias e Status ── *@
+            <MudItem xs="12" sm="6">
+                <MudNumericField @bind-Value="PlanoModel.CaloriasDiarias" Label="Calorias Diárias (kcal)"
+                                 Placeholder="2000" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="string" @bind-Value="PlanoModel.Status" Label="Status"
+                           Variant="Variant.Outlined" Margin="Margin.Dense">
+                    <MudSelectItem Value="@("ativo")">Ativo</MudSelectItem>
+                    <MudSelectItem Value="@("inativo")">Inativo</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+
+            @* ── Macros ── *@
+            <MudItem xs="12" sm="4">
+                <MudNumericField T="decimal?" @bind-Value="PlanoModel.ProteinasG" Label="Proteínas (g)"
+                                 Placeholder="150" Variant="Variant.Outlined" Margin="Margin.Dense" Step="1M" />
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudNumericField T="decimal?" @bind-Value="PlanoModel.CarboidratosG" Label="Carboidratos (g)"
+                                 Placeholder="200" Variant="Variant.Outlined" Margin="Margin.Dense" Step="1M" />
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudNumericField T="decimal?" @bind-Value="PlanoModel.GordurasG" Label="Gorduras (g)"
+                                 Placeholder="60" Variant="Variant.Outlined" Margin="Margin.Dense" Step="1M" />
+            </MudItem>
+        </MudGrid>
+
+        @* ── Refeições ── *@
+        <div class="d-flex justify-space-between align-center mt-8 mb-4">
+            <MudText Typo="Typo.h6" Class="font-bold">Refeições</MudText>
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Add" Class="rounded-lg text-none px-4"
+                       Style="border-color: #e2e8f0; color: #475569;" OnClick="AdicionarRefeicao">
+                Adicionar
+            </MudButton>
+        </div>
+
+        @for (int i = 0; i < RefeicoesList.Count; i++)
+        {
+            var index = i;
+            <MudPaper Class="pa-4 mb-4 rounded-lg" Elevation="0" Style="border: 1px solid #e2e8f0; background-color: #fafafa;">
+                <div class="d-flex justify-space-between align-center mb-3">
+                    <MudText Typo="Typo.subtitle2" Class="font-bold" Style="color: #475569;">Refeição @(index + 1)</MudText>
+                    @if (RefeicoesList.Count > 1)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" Color="Color.Error"
+                                       OnClick="@(() => RemoverRefeicao(index))" />
+                    }
+                </div>
+                <MudGrid Spacing="3">
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="RefeicoesList[index].Nome" Label="" Placeholder="Nome (Ex: Café da Manhã)"
+                                      Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="RefeicoesList[index].HorarioTexto" Label="" Placeholder="Horário (Ex: 07:00)"
+                                      Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="RefeicoesList[index].Alimentos" Label="" Placeholder="Alimentos e quantidades..."
+                                      Lines="2" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudNumericField T="int?" @bind-Value="RefeicoesList[index].Calorias" Label=""
+                                         Placeholder="Calorias" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+        }
+
+        @* ── Orientações Gerais ── *@
+        <MudTextField @bind-Value="PlanoModel.Orientacoes" Label="Orientações Gerais" Lines="3"
+                      Placeholder="Recomendações gerais de hidratação, horários, etc."
+                      Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-6" />
+
+        @* ── Observações do Nutricionista ── *@
+        <MudTextField @bind-Value="PlanoModel.ObservacoesNutricionista" Label="Observações do Nutricionista" Lines="3"
+                      Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-4" />
+
+        @* ── Ações ── *@
+        <div class="d-flex justify-end gap-4 mt-6">
+            <MudButton OnClick="Cancelar" Variant="Variant.Outlined">Cancelar</MudButton>
+            <MudButton OnClick="SalvarPlano" Color="Color.Success" Variant="Variant.Filled" Class="px-6 rounded-lg text-none"
+                       Disabled="@IsSaving">
+                @if (IsSaving)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <span>Salvando...</span>
+                }
+                else
+                {
+                    <span>Salvar Plano</span>
+                }
+            </MudButton>
+        </div>
+    </MudForm>
+</MudPaper>
+
+@code {
+    private MudForm form = null!;
+    private bool success;
+    private bool IsSaving;
+    private bool IsGeneratingIA;
+
+    private PlanoDieta PlanoModel { get; set; } = new() { Status = "ativo" };
+    private List<RefeicaoForm> RefeicoesList { get; set; } = new() { new() };
+    private List<Paciente> Pacientes { get; set; } = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await AuthService.InitializeAsync();
+            if (AuthService.CurrentUser == null)
+            {
+                NavigationManager.NavigateTo("/");
+                return;
+            }
+
+            Pacientes = await DbContext.Pacientes
+                .Where(p => p.UsuarioId == AuthService.CurrentUser.Id)
+                .OrderBy(p => p.Nome)
+                .ToListAsync();
+
+            StateHasChanged();
+        }
+    }
+
+    private void AdicionarRefeicao()
+    {
+        RefeicoesList.Add(new RefeicaoForm());
+    }
+
+    private void RemoverRefeicao(int index)
+    {
+        if (index >= 0 && index < RefeicoesList.Count && RefeicoesList.Count > 1)
+        {
+            RefeicoesList.RemoveAt(index);
+        }
+    }
+
+    private async Task SalvarPlano()
+    {
+        await form.Validate();
+        if (!success) return;
+
+        IsSaving = true;
+        try
+        {
+            // 1. Salvar o plano primeiro para obter o ID
+            var plano = new PlanoDieta
+            {
+                PacienteId = PlanoModel.PacienteId,
+                Titulo = PlanoModel.Titulo,
+                Objetivo = PlanoModel.Objetivo,
+                CaloriasDiarias = PlanoModel.CaloriasDiarias,
+                ProteinasG = PlanoModel.ProteinasG,
+                CarboidratosG = PlanoModel.CarboidratosG,
+                GordurasG = PlanoModel.GordurasG,
+                Orientacoes = PlanoModel.Orientacoes,
+                ObservacoesNutricionista = PlanoModel.ObservacoesNutricionista,
+                Status = PlanoModel.Status ?? "ativo",
+                GeradoPorIa = false,
+                DataCriacao = DateTime.Now
+            };
+
+            DbContext.PlanosDieta.Add(plano);
+            await DbContext.SaveChangesAsync();
+
+            // 2. Salvar as refeições vinculadas ao plano criado
+            var refeicoes = RefeicoesList
+                .Where(r => !string.IsNullOrWhiteSpace(r.Nome))
+                .Select(rf =>
+                {
+                    var refeicao = new Refeicao
+                    {
+                        PlanoId = plano.Id,
+                        Nome = rf.Nome,
+                        Horario = rf.HorarioTexto,
+                        Alimentos = rf.Alimentos,
+                        Calorias = rf.Calorias,
+                        DataCriacao = DateTime.Now
+                    };
+
+                    return refeicao;
+                }).ToList();
+
+            if (refeicoes.Any())
+            {
+                DbContext.Refeicoes.AddRange(refeicoes);
+                await DbContext.SaveChangesAsync();
+            }
+
+            Snackbar.Add("Plano alimentar criado com sucesso!", Severity.Success);
+            NavigationManager.NavigateTo("/planos");
+        }
+        catch (Exception ex)
+        {
+            var innerMsg = ex.InnerException?.Message ?? ex.Message;
+            Console.WriteLine($"Erro ao salvar plano: {innerMsg}");
+            Snackbar.Add($"Erro ao salvar plano: {innerMsg}", Severity.Error);
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+
+    private async Task GerarComIA()
+    {
+        if (PlanoModel.PacienteId == null) return;
+        
+        IsGeneratingIA = true;
+        StateHasChanged();
+        
+        try
+        {
+            var paciente = Pacientes.FirstOrDefault(p => p.Id == PlanoModel.PacienteId);
+            if (paciente == null) return;
+
+            var result = await AIService.GenerateDietPlanAsync(paciente);
+            if (result != null)
+            {
+                PlanoModel.Titulo = result.Titulo;
+                PlanoModel.Objetivo = result.Objetivo;
+                PlanoModel.CaloriasDiarias = result.CaloriasDiarias;
+                PlanoModel.ProteinasG = result.ProteinasG;
+                PlanoModel.CarboidratosG = result.CarboidratosG;
+                PlanoModel.GordurasG = result.GordurasG;
+                PlanoModel.Orientacoes = result.Orientacoes;
+                PlanoModel.ObservacoesNutricionista = result.ObservacoesNutricionista;
+                PlanoModel.GeradoPorIa = true;
+
+                if (result.Refeicoes != null && result.Refeicoes.Any())
+                {
+                    RefeicoesList = result.Refeicoes.Select(r => new RefeicaoForm
+                    {
+                        Nome = r.Nome,
+                        HorarioTexto = r.HorarioTexto,
+                        Alimentos = r.Alimentos,
+                        Calorias = r.Calorias
+                    }).ToList();
+                }
+                
+                Snackbar.Add("Plano alimentar gerado com sucesso pela IA!", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Falha ao gerar o plano. O formato retornado pode ser inválido.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro ao gerar com IA: {ex.Message}");
+            Snackbar.Add("Erro ao comunicar com a IA.", Severity.Error);
+        }
+        finally
+        {
+            IsGeneratingIA = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Cancelar()
+    {
+        NavigationManager.NavigateTo("/planos");
+    }
+
+    // Classe auxiliar para o formulário de refeições
+    public class RefeicaoForm
+    {
+        public string? Nome { get; set; }
+        public string? HorarioTexto { get; set; }
+        public string? Alimentos { get; set; }
+        public int? Calorias { get; set; }
+    }
+}

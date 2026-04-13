@@ -1,5 +1,13 @@
 @page "/planos"
+@rendermode InteractiveServer
+@using NutriFlow.Data
+@using NutriFlow.Models
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NutriFlow.Services.AuthService AuthService
 
 <PageTitle>Planos Alimentares - NutriAI</PageTitle>
 
@@ -8,53 +16,152 @@
         <MudText Typo="Typo.h5" Class="font-bold">Planos Alimentares</MudText>
         <MudText Typo="Typo.body2" Style="color: #6b7280;">Crie e gerencie dietas personalizadas com IA</MudText>
     </div>
-    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Class="rounded-lg text-none px-4">
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Class="rounded-lg text-none px-4" Href="/planos/novo">
         Novo Plano
     </MudButton>
 </div>
 
-<!-- Plans List -->
-<div class="d-flex flex-column gap-4">
-    @foreach (var p in planos)
-    {
-        <MudPaper Class="nutri-card pa-4 d-flex justify-space-between align-center" Elevation="0">
-            <div class="d-flex align-center gap-4">
-                <div class="stat-icon-wrapper icon-green" style="width: 48px; height: 48px;">
-                    <MudIcon Icon="@Icons.Material.Filled.Fastfood" Size="Size.Medium" />
-                </div>
-                <div>
-                    <MudText Typo="Typo.subtitle1" Class="font-bold">@p.Titulo</MudText>
-                    <div class="d-flex align-center gap-2 mt-1">
-                        <MudText Typo="Typo.caption" Style="color: #6b7280;">@p.PacienteNome</MudText>
-                        <MudText Typo="Typo.caption" Style="color: #6b7280;">·</MudText>
-                        <MudText Typo="Typo.caption" Style="color: #6b7280;">@p.Calorias kcal</MudText>
-                        <MudText Typo="Typo.caption" Style="color: #6b7280;">·</MudText>
-                        <MudText Typo="Typo.caption" Style="color: #6b7280;">@p.Refeicoes refeições</MudText>
+@if (IsLoading)
+{
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" Class="d-block mx-auto mt-16" />
+}
+else if (!planos.Any())
+{
+    <MudPaper Class="pa-8 text-center" Elevation="0" Style="border: 1px solid #f1f5f9; border-radius: 12px;">
+        <MudIcon Icon="@Icons.Material.Outlined.RestaurantMenu" Size="Size.Large" Style="color: #cbd5e1;" />
+        <MudText Typo="Typo.h6" Class="mt-4 font-bold" Style="color: #94a3b8;">Nenhum plano cadastrado</MudText>
+        <MudText Typo="Typo.body2" Style="color: #94a3b8;" Class="mt-1">Clique em "Novo Plano" para criar o primeiro plano alimentar.</MudText>
+    </MudPaper>
+}
+else
+{
+    <!-- Plans List -->
+    <div class="d-flex flex-column gap-4">
+        @foreach (var p in planos)
+        {
+            <MudPaper Class="nutri-card pa-4 d-flex justify-space-between align-center" Elevation="0">
+                <div class="d-flex align-center gap-4">
+                    <div class="stat-icon-wrapper icon-green" style="width: 48px; height: 48px;">
+                        <MudIcon Icon="@Icons.Material.Filled.Fastfood" Size="Size.Medium" />
+                    </div>
+                    <div>
+                        <MudText Typo="Typo.subtitle1" Class="font-bold">@(p.Titulo ?? "Sem título")</MudText>
+                        <div class="d-flex align-center gap-2 mt-1">
+                            <MudText Typo="Typo.caption" Style="color: #6b7280;">@(p.Paciente?.Nome ?? "-")</MudText>
+                            <MudText Typo="Typo.caption" Style="color: #6b7280;">·</MudText>
+                            <MudText Typo="Typo.caption" Style="color: #6b7280;">@(p.CaloriasDiarias?.ToString() ?? "-") kcal</MudText>
+                            <MudText Typo="Typo.caption" Style="color: #6b7280;">·</MudText>
+                            <MudText Typo="Typo.caption" Style="color: #6b7280;">@p.Refeicoes.Count refeições</MudText>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="d-flex align-center gap-4">
-                <span class="status-badge ativo">ativo</span>
-                <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Style="color: #6b7280;" />
-                <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Size="Size.Small" Color="Color.Error" />
-            </div>
-        </MudPaper>
-    }
-</div>
+                <div class="d-flex align-center gap-4">
+                    <span class="status-badge @(p.Status == "ativo" ? "ativo" : "")">@(p.Status ?? "ativo")</span>
+                    <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Style="color: #6b7280;"
+                                   OnClick="@(() => AbrirDetalhes(p))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Size="Size.Small" Color="Color.Error"
+                                   OnClick="@(() => ExcluirPlano(p))" />
+                </div>
+            </MudPaper>
+        }
+    </div>
+}
 
 @code {
-    private List<PlanoViewModel> planos = new()
-    {
-        new() { Titulo = "Plano Hipocalórico - Março 2025", PacienteNome = "Ana Paula Ferreira", Calorias = 1600, Refeicoes = 5, Status = "ativo" },
-        new() { Titulo = "Plano Hiperproteico - Ganho de Massa", PacienteNome = "Carlos Eduardo Silva", Calorias = 3200, Refeicoes = 5, Status = "ativo" }
-    };
+    private List<PlanoDieta> planos = new();
+    private bool IsLoading = true;
 
-    public class PlanoViewModel
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        public string Titulo { get; set; } = "";
-        public string PacienteNome { get; set; } = "";
-        public int Calorias { get; set; }
-        public int Refeicoes { get; set; }
-        public string Status { get; set; } = "";
+        if (firstRender)
+        {
+            await AuthService.InitializeAsync();
+            if (AuthService.CurrentUser == null)
+            {
+                NavigationManager.NavigateTo("/");
+                return;
+            }
+
+            await LoadPlanos();
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadPlanos()
+    {
+        IsLoading = true;
+        try
+        {
+            // Buscar IDs dos pacientes do usuário logado
+            var pacienteIds = await DbContext.Pacientes
+                .Where(p => p.UsuarioId == AuthService.CurrentUser!.Id)
+                .Select(p => p.Id)
+                .ToListAsync();
+
+            // Buscar todos os planos desses pacientes
+            planos = await DbContext.PlanosDieta
+                .Include(pd => pd.Paciente)
+                .Include(pd => pd.Refeicoes)
+                .Where(pd => pd.PacienteId != null && pacienteIds.Contains(pd.PacienteId.Value))
+                .OrderByDescending(pd => pd.DataCriacao)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro ao carregar planos: {ex.InnerException?.Message ?? ex.Message}");
+            Snackbar.Add("Erro ao carregar planos alimentares.", Severity.Error);
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task ExcluirPlano(PlanoDieta plano)
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Confirmar exclusão",
+            $"Deseja realmente excluir o plano \"{plano.Titulo}\"? Todas as refeições vinculadas também serão excluídas.",
+            yesText: "Excluir",
+            cancelText: "Cancelar");
+
+        if (confirm != true) return;
+
+        try
+        {
+            // Remover todas as refeições vinculadas ao plano
+            var refeicoes = await DbContext.Refeicoes
+                .Where(r => r.PlanoId == plano.Id)
+                .ToListAsync();
+
+            if (refeicoes.Any())
+            {
+                DbContext.Refeicoes.RemoveRange(refeicoes);
+            }
+
+            // Remover o plano
+            DbContext.PlanosDieta.Remove(plano);
+            await DbContext.SaveChangesAsync();
+
+            planos.Remove(plano);
+            Snackbar.Add("Plano e refeições excluídos com sucesso.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao excluir plano: {ex.InnerException?.Message ?? ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task AbrirDetalhes(PlanoDieta plano)
+    {
+        var parameters = new DialogParameters { ["Plano"] = plano };
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+            CloseButton = true
+        };
+        await DialogService.ShowAsync<NutriFlow.Components.Dialogs.DetalhesPlanoDialog>("Detalhes do Plano", parameters, options);
     }
 }

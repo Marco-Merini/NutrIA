@@ -1,0 +1,114 @@
+@using NutriFlow.Models
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6" Class="font-bold">Detalhes do Plano</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (Plano != null)
+        {
+            @* ── Título + Status ── *@
+            <div class="d-flex justify-space-between align-center mb-1">
+                <MudText Typo="Typo.h5" Class="font-bold">@(Plano.Titulo ?? "Sem título")</MudText>
+                <span style="background-color: #e5f9f0; color: #2bd07b; padding: 4px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 600;">
+                    @(Plano.Status ?? "ativo")
+                </span>
+            </div>
+            <MudText Typo="Typo.body2" Style="color: #6b7280;" Class="mb-4">@(Plano.Paciente?.Nome ?? "-")</MudText>
+
+            @* ── Objetivo ── *@
+            @if (!string.IsNullOrWhiteSpace(Plano.Objetivo))
+            {
+                <MudPaper Class="pa-3 rounded-lg mb-4" Elevation="0" Style="background-color: #f0fdf4; border: 1px solid #bbf7d0;">
+                    <MudText Typo="Typo.overline" Style="color: #16a34a; font-weight: 700; letter-spacing: 1px;">OBJETIVO</MudText>
+                    <MudText Typo="Typo.body2" Style="color: #334155;">@Plano.Objetivo</MudText>
+                </MudPaper>
+            }
+
+            @* ── Macros ── *@
+            <MudGrid Spacing="3" Class="mb-5">
+                <MudItem xs="3">
+                    <div class="pa-3 rounded-lg text-center" style="background-color: #f0fdf4; border: 1px solid #bbf7d0;">
+                        <MudText Typo="Typo.h6" Class="font-bold" Style="color: #16a34a;">@(Plano.CaloriasDiarias?.ToString() ?? "-")</MudText>
+                        <MudText Typo="Typo.caption" Style="color: #6b7280;">kcal</MudText>
+                    </div>
+                </MudItem>
+                <MudItem xs="3">
+                    <div class="pa-3 rounded-lg text-center" style="background-color: #fefce8; border: 1px solid #fde68a;">
+                        <MudText Typo="Typo.h6" Class="font-bold" Style="color: #ca8a04;">@(Plano.ProteinasG?.ToString("0.##") ?? "-")</MudText>
+                        <MudText Typo="Typo.caption" Style="color: #6b7280;">Proteínas (g)</MudText>
+                    </div>
+                </MudItem>
+                <MudItem xs="3">
+                    <div class="pa-3 rounded-lg text-center" style="background-color: #fff7ed; border: 1px solid #fed7aa;">
+                        <MudText Typo="Typo.h6" Class="font-bold" Style="color: #ea580c;">@(Plano.CarboidratosG?.ToString("0.##") ?? "-")</MudText>
+                        <MudText Typo="Typo.caption" Style="color: #6b7280;">Carboidratos (g)</MudText>
+                    </div>
+                </MudItem>
+                <MudItem xs="3">
+                    <div class="pa-3 rounded-lg text-center" style="background-color: #eff6ff; border: 1px solid #bfdbfe;">
+                        <MudText Typo="Typo.h6" Class="font-bold" Style="color: #2563eb;">@(Plano.GordurasG?.ToString("0.##") ?? "-")</MudText>
+                        <MudText Typo="Typo.caption" Style="color: #6b7280;">Gorduras (g)</MudText>
+                    </div>
+                </MudItem>
+            </MudGrid>
+
+            @* ── Refeições ── *@
+            @if (Plano.Refeicoes != null && Plano.Refeicoes.Any())
+            {
+                <MudText Typo="Typo.h6" Class="font-bold mb-3">Refeições</MudText>
+                <div class="d-flex flex-column gap-3 mb-5">
+                    @foreach (var r in Plano.Refeicoes)
+                    {
+                        <MudPaper Class="pa-4 rounded-lg" Elevation="0" Style="border: 1px solid #e2e8f0;">
+                            <div class="d-flex justify-space-between align-center mb-1">
+                                <MudText Typo="Typo.subtitle2" Class="font-bold">@(r.Nome ?? "-")</MudText>
+                                <div class="d-flex align-center gap-3">
+                                    @if (!string.IsNullOrWhiteSpace(r.Horario))
+                                    {
+                                        <MudText Typo="Typo.caption" Style="color: #6b7280;">@r.Horario</MudText>
+                                    }
+                                    @if (r.Calorias != null)
+                                    {
+                                        <span style="color: #ea580c; font-size: 0.8rem; font-weight: 600;">@r.Calorias kcal</span>
+                                    }
+                                </div>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(r.Alimentos))
+                            {
+                                <MudText Typo="Typo.body2" Style="color: #64748b;">@r.Alimentos</MudText>
+                            }
+                        </MudPaper>
+                    }
+                </div>
+            }
+
+            @* ── Orientações Gerais ── *@
+            @if (!string.IsNullOrWhiteSpace(Plano.Orientacoes))
+            {
+                <MudText Typo="Typo.h6" Class="font-bold mb-2">Orientações Gerais</MudText>
+                <MudText Typo="Typo.body2" Style="color: #334155;" Class="mb-4">@Plano.Orientacoes</MudText>
+            }
+
+            @* ── Observações do Nutricionista ── *@
+            @if (!string.IsNullOrWhiteSpace(Plano.ObservacoesNutricionista))
+            {
+                <MudText Typo="Typo.h6" Class="font-bold mb-2">Observações do Nutricionista</MudText>
+                <MudText Typo="Typo.body2" Style="color: #334155;">@Plano.ObservacoesNutricionista</MudText>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Fechar" Variant="Variant.Outlined" Class="rounded-lg text-none px-6">Fechar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public PlanoDieta? Plano { get; set; }
+
+    private void Fechar() => MudDialog.Close();
+}
