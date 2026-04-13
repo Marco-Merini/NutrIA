@@ -23,7 +23,7 @@ namespace NutriFlow.Models
         public string? Objetivo { get; set; }
         
         [Column("calorias_diarias")]
-        public int? CaloriasDiarias { get; set; }
+        public decimal? CaloriasDiarias { get; set; }
         
         [Column("proteinas_g")]
         public decimal? ProteinasG { get; set; }

@@ -20,13 +20,13 @@ namespace NutriFlow.Models
         public string? Nome { get; set; }
         
         [Column("horario")]
-        public TimeSpan? Horario { get; set; }
+        public string? Horario { get; set; }
         
         [Column("alimentos")]
         public string? Alimentos { get; set; }
         
         [Column("calorias")]
-        public int? Calorias { get; set; }
+        public decimal? Calorias { get; set; }
         
         [Column("data_criacao")]
         public DateTime? DataCriacao { get; set; }
