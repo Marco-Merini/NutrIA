@@ -32,7 +32,7 @@ namespace NutriFlow.Models
         public decimal? PercentualGordura { get; set; }
         
         [Column("aderencia_plano")]
-        public int? AderenciaPlano { get; set; }
+        public string? AderenciaPlano { get; set; }
         
         [Column("humor")]
         public string? Humor { get; set; }

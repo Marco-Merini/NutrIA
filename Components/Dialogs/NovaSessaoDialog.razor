@@ -1,0 +1,124 @@
+@using NutriFlow.Data
+@using NutriFlow.Models
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject ISnackbar Snackbar
+@inject NutriFlow.Services.AuthService AuthService
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6" Class="font-bold">Nova Sessão</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="form" @bind-IsValid="success">
+            <MudGrid Spacing="4">
+                <MudItem xs="12">
+                    <MudSelect T="int?" @bind-Value="SessaoModel.PacienteId" Label="Paciente *" Placeholder="Selecione o paciente"
+                               Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" RequiredError="Selecione um paciente">
+                        @foreach (var p in Pacientes)
+                        {
+                            <MudSelectItem T="int?" Value="@p.Id">@p.Nome</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudDatePicker @bind-Date="SessaoModel.DataSessao" Label="Data da Sessão"
+                                   Variant="Variant.Outlined" Margin="Margin.Dense" DateFormat="dd/MM/yyyy" />
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="string" @bind-Value="SessaoModel.Tipo" Label="Tipo de Consulta" Placeholder="Tipo"
+                               Variant="Variant.Outlined" Margin="Margin.Dense">
+                        <MudSelectItem Value="@("Consulta Inicial")">Consulta Inicial</MudSelectItem>
+                        <MudSelectItem Value="@("Retorno")">Retorno</MudSelectItem>
+                        <MudSelectItem Value="@("Avaliação")">Avaliação</MudSelectItem>
+                        <MudSelectItem Value="@("Acompanhamento")">Acompanhamento</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudNumericField T="decimal?" @bind-Value="SessaoModel.PesoSessao" Label="Peso na Sessão (kg)"
+                                     Placeholder="70.5" Variant="Variant.Outlined" Margin="Margin.Dense" Step="0.1M" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="SessaoModel.Anotacoes" Label="Anotações da Consulta" Lines="4"
+                                  Placeholder="Observações, orientações, evolução do paciente..."
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudDatePicker @bind-Date="SessaoModel.ProximaConsulta" Label="Próxima Consulta"
+                                   Variant="Variant.Outlined" Margin="Margin.Dense" DateFormat="dd/MM/yyyy" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar" Variant="Variant.Outlined" Class="rounded-lg text-none px-6">Cancelar</MudButton>
+        <MudButton OnClick="Salvar" Color="Color.Success" Variant="Variant.Filled" Class="rounded-lg text-none px-6"
+                   Disabled="@IsSaving">
+            @if (IsSaving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>Salvando...</span>
+            }
+            else
+            {
+                <span>Registrar Sessão</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private MudForm form = null!;
+    private bool success;
+    private bool IsSaving;
+
+    private Sessao SessaoModel { get; set; } = new() { DataSessao = DateTime.Today };
+    private List<Paciente> Pacientes { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await AuthService.InitializeAsync();
+        if (AuthService.CurrentUser != null)
+        {
+            Pacientes = await DbContext.Pacientes
+                .Where(p => p.UsuarioId == AuthService.CurrentUser.Id)
+                .OrderBy(p => p.Nome)
+                .ToListAsync();
+        }
+    }
+
+    private async Task Salvar()
+    {
+        await form.Validate();
+        if (!success) return;
+
+        IsSaving = true;
+        try
+        {
+            SessaoModel.DataCriacao = DateTime.Now;
+            DbContext.Sessoes.Add(SessaoModel);
+            await DbContext.SaveChangesAsync();
+
+            Snackbar.Add("Sessão registrada com sucesso!", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao registrar sessão: {ex.InnerException?.Message ?? ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+}

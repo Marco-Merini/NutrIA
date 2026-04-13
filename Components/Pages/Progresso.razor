@@ -1,5 +1,13 @@
 @page "/progresso"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using NutriFlow.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NutriFlow.Services.AuthService AuthService
 
 <PageTitle>Progresso - NutriAI</PageTitle>
 
@@ -8,57 +16,132 @@
         <MudText Typo="Typo.h5" Class="font-bold">Monitoramento de Progresso</MudText>
         <MudText Typo="Typo.body2" Style="color: #6b7280;">Acompanhe a evolução dos pacientes</MudText>
     </div>
-    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Class="rounded-lg text-none px-4">
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Class="rounded-lg text-none px-4"
+               OnClick="AbrirRegistrarProgresso">
         Registrar Progresso
     </MudButton>
 </div>
 
-<!-- Filters -->
-<div class="d-flex gap-2 mb-6">
-    <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Style="border-radius: 8px;">Todos</MudChip>
-    <MudChip T="string" Color="Color.Default" Variant="Variant.Filled" Style="border-radius: 8px; background-color: #f0f2f5;">Ana Paula Ferreira</MudChip>
-    <MudChip T="string" Color="Color.Default" Variant="Variant.Filled" Style="border-radius: 8px; background-color: #f0f2f5;">Carlos Eduardo Silva</MudChip>
-    <MudChip T="string" Color="Color.Default" Variant="Variant.Filled" Style="border-radius: 8px; background-color: #f0f2f5;">Mariana Costa</MudChip>
-</div>
+@if (IsLoading)
+{
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" Class="d-block mx-auto mt-16" />
+}
+else
+{
+    <!-- Filters -->
+    <div class="d-flex gap-2 mb-6" style="flex-wrap: wrap;">
+        <MudChip T="string" Color="@(filtroSelecionado == null ? Color.Primary : Color.Default)" 
+                 Variant="Variant.Filled" Style="@(filtroSelecionado == null ? "border-radius: 8px;" : "border-radius: 8px; background-color: #f0f2f5;")"
+                 OnClick="@(() => FiltrarPorPaciente(null))">
+            Todos
+        </MudChip>
+        @foreach (var paciente in pacientes)
+        {
+            <MudChip T="string" Color="@(filtroSelecionado == paciente.Id ? Color.Primary : Color.Default)" 
+                     Variant="Variant.Filled" 
+                     Style="@(filtroSelecionado == paciente.Id ? "border-radius: 8px;" : "border-radius: 8px; background-color: #f0f2f5;")"
+                     OnClick="@(() => FiltrarPorPaciente(paciente.Id))">
+                @paciente.Nome
+            </MudChip>
+        }
+    </div>
 
-<!-- Chart Area -->
-<MudPaper Class="nutri-card pa-6 mb-6" Elevation="0">
-    <MudText Typo="Typo.subtitle1" Class="font-bold mb-4">Evolução do Peso</MudText>
-    <MudChart ChartType="ChartType.Line" ChartSeries="@Series" @bind-SelectedIndex="Index" XAxisLabels="@XAxisLabels" Width="100%" Height="300px" ChartOptions="@Options" />
-</MudPaper>
-
-<!-- Progress List -->
-<div class="d-flex flex-column gap-4">
-    @foreach (var p in progressos)
+    <!-- Chart Area -->
+    @if (ProgressosFiltrados.Any())
     {
-        <MudPaper Class="nutri-card pa-4 d-flex justify-space-between align-start" Elevation="0">
-            <div class="d-flex gap-4">
-                <div class="stat-icon-wrapper icon-orange" style="width: 48px; height: 48px; flex-shrink: 0;">
-                    <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Medium" />
-                </div>
-                <div>
-                    <div class="d-flex align-center gap-3 mb-1">
-                        <MudText Typo="Typo.subtitle2" Class="font-bold">@p.PacienteNome</MudText>
-                        <MudText Typo="Typo.caption" Style="color: #a0aabf;">@p.DataRegistro.ToString("yyyy-MM-dd")</MudText>
-                    </div>
-                    
-                    <div class="d-flex align-center gap-3 mb-2">
-                        <MudText Typo="Typo.body2" Style="color: #6b7280;">@p.Peso kg</MudText>
-                        <span class="status-badge ativo">Aderência: @p.AderenciaPlano</span>
-                        <MudText Typo="Typo.body2" Style="color: #6b7280;">Energia: @p.Energia</MudText>
-                    </div>
-                    
-                    <MudText Typo="Typo.body2" Style="color: #6b7280;">@p.Feedback</MudText>
-                </div>
-            </div>
-            
-            <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Size="Size.Small" Color="Color.Error" />
+        <MudPaper Class="nutri-card pa-6 mb-6" Elevation="0">
+            <MudText Typo="Typo.subtitle1" Class="font-bold mb-4">Evolução do Peso</MudText>
+            <MudChart ChartType="ChartType.Line" ChartSeries="@Series" @bind-SelectedIndex="Index" 
+                      XAxisLabels="@XAxisLabels" Width="100%" Height="300px" ChartOptions="@Options" />
         </MudPaper>
     }
-</div>
+
+    <!-- Progress List -->
+    @if (!ProgressosFiltrados.Any())
+    {
+        <MudPaper Class="pa-8 text-center" Elevation="0" Style="border: 1px solid #f1f5f9; border-radius: 12px;">
+            <MudIcon Icon="@Icons.Material.Outlined.TrendingUp" Size="Size.Large" Style="color: #cbd5e1;" />
+            <MudText Typo="Typo.h6" Class="mt-4 font-bold" Style="color: #94a3b8;">Nenhum progresso registrado</MudText>
+            <MudText Typo="Typo.body2" Style="color: #94a3b8;" Class="mt-1">Clique em "Registrar Progresso" para registrar o primeiro acompanhamento.</MudText>
+        </MudPaper>
+    }
+    else
+    {
+        <div class="d-flex flex-column gap-4">
+            @foreach (var p in ProgressosFiltrados)
+            {
+                <MudPaper Class="nutri-card pa-4 d-flex justify-space-between align-start" Elevation="0">
+                    <div class="d-flex gap-4">
+                        <div class="stat-icon-wrapper icon-orange" style="width: 48px; height: 48px; flex-shrink: 0;">
+                            <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Medium" />
+                        </div>
+                        <div>
+                            <div class="d-flex align-center gap-3 mb-1">
+                                <MudText Typo="Typo.subtitle2" Class="font-bold">@(p.Paciente?.Nome ?? "-")</MudText>
+                                <MudText Typo="Typo.caption" Style="color: #a0aabf;">@(p.DataRegistro?.ToString("dd/MM/yyyy") ?? "-")</MudText>
+                            </div>
+                            
+                            <div class="d-flex align-center gap-3 mb-2" style="flex-wrap: wrap;">
+                                @if (p.Peso != null)
+                                {
+                                    <MudText Typo="Typo.body2" Style="color: #6b7280;">@p.Peso?.ToString("0.##") kg</MudText>
+                                }
+                                @if (p.PercentualGordura != null)
+                                {
+                                    <MudText Typo="Typo.body2" Style="color: #6b7280;">Gordura: @p.PercentualGordura?.ToString("0.##")%</MudText>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(p.AderenciaPlano))
+                                {
+                                    <span class="status-badge ativo">Aderência: @p.AderenciaPlano</span>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(p.Energia))
+                                {
+                                    <MudText Typo="Typo.body2" Style="color: #6b7280;">Energia: @p.Energia</MudText>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(p.Humor))
+                                {
+                                    <MudText Typo="Typo.body2" Style="color: #6b7280;">Humor: @p.Humor</MudText>
+                                }
+                            </div>
+
+                            <div class="d-flex align-center gap-3 mb-2" style="flex-wrap: wrap;">
+                                @if (p.CinturaCm != null)
+                                {
+                                    <MudText Typo="Typo.caption" Style="color: #a0aabf;">Cintura: @p.CinturaCm?.ToString("0.##") cm</MudText>
+                                }
+                                @if (p.QuadrilCm != null)
+                                {
+                                    <MudText Typo="Typo.caption" Style="color: #a0aabf;">Quadril: @p.QuadrilCm?.ToString("0.##") cm</MudText>
+                                }
+                            </div>
+                            
+                            @if (!string.IsNullOrWhiteSpace(p.Feedback))
+                            {
+                                <MudText Typo="Typo.body2" Style="color: #6b7280;">@p.Feedback</MudText>
+                            }
+                        </div>
+                    </div>
+                    
+                    <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Size="Size.Small" Color="Color.Error" 
+                                   OnClick="@(() => ExcluirProgresso(p))" />
+                </MudPaper>
+            }
+        </div>
+    }
+}
 
 @code {
     private int Index = -1;
+    private bool IsLoading = true;
+    private int? filtroSelecionado = null;
+
+    private List<NutriFlow.Models.Paciente> pacientes = new();
+    private List<NutriFlow.Models.Progresso> progressos = new();
+
+    private List<NutriFlow.Models.Progresso> ProgressosFiltrados => filtroSelecionado == null
+        ? progressos
+        : progressos.Where(p => p.PacienteId == filtroSelecionado).ToList();
+
     public ChartOptions Options = new ChartOptions()
     {
         LineStrokeWidth = 3,
@@ -67,40 +150,128 @@
         ChartPalette = new[] { "#2bd07b" }
     };
 
-    public List<ChartSeries> Series = new List<ChartSeries>()
-    {
-        new ChartSeries() { Name = "Peso", Data = new double[] { 88, 72.5, 71.2, 70.1, 89 } }
-    };
+    public List<ChartSeries> Series { get; set; } = new();
+    public string[] XAxisLabels { get; set; } = Array.Empty<string>();
 
-    public string[] XAxisLabels = { "2025-03-01", "2025-03-15", "2025-04-01", "2025-04-15" };
-
-    private List<ProgressoViewModel> progressos = new()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        new() { 
-            PacienteNome = "Ana Paula Ferreira", 
-            DataRegistro = new DateTime(2025, 04, 01), 
-            Peso = 70.1m, 
-            AderenciaPlano = "excelente", 
-            Energia = "alta", 
-            Feedback = "Ótima evolução! Glicemia controlando bem." 
-        },
-        new() { 
-            PacienteNome = "Carlos Eduardo Silva", 
-            DataRegistro = new DateTime(2025, 04, 01), 
-            Peso = 89.0m, 
-            AderenciaPlano = "boa", 
-            Energia = "alta", 
-            Feedback = "Adaptação inicial positiva. Aumento de força." 
+        if (firstRender)
+        {
+            await AuthService.InitializeAsync();
+
+
+            await LoadData();
+            StateHasChanged();
         }
-    };
+    }
 
-    public class ProgressoViewModel
+    private async Task LoadData()
     {
-        public string PacienteNome { get; set; } = "";
-        public DateTime DataRegistro { get; set; }
-        public decimal Peso { get; set; }
-        public string AderenciaPlano { get; set; } = "";
-        public string Energia { get; set; } = "";
-        public string Feedback { get; set; } = "";
+        IsLoading = true;
+        try
+        {
+            var userId = AuthService.CurrentUser!.Id;
+
+            pacientes = await DbContext.Pacientes
+                .Where(p => p.UsuarioId == userId)
+                .OrderBy(p => p.Nome)
+                .ToListAsync();
+
+            var pacienteIds = pacientes.Select(p => p.Id).ToList();
+
+            progressos = await DbContext.Progressos
+                .Include(p => p.Paciente)
+                .Where(p => p.PacienteId != null && pacienteIds.Contains(p.PacienteId.Value))
+                .OrderByDescending(p => p.DataRegistro)
+                .ToListAsync();
+
+            AtualizarGrafico();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro ao carregar progressos: {ex.InnerException?.Message ?? ex.Message}");
+            Snackbar.Add("Erro ao carregar progressos.", Severity.Error);
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void FiltrarPorPaciente(int? pacienteId)
+    {
+        filtroSelecionado = pacienteId;
+        AtualizarGrafico();
+    }
+
+    private void AtualizarGrafico()
+    {
+        var dados = ProgressosFiltrados
+            .Where(p => p.Peso != null && p.DataRegistro != null)
+            .OrderBy(p => p.DataRegistro)
+            .ToList();
+
+        if (dados.Any())
+        {
+            Series = new List<ChartSeries>()
+            {
+                new ChartSeries()
+                {
+                    Name = "Peso",
+                    Data = dados.Select(p => (double)p.Peso!.Value).ToArray()
+                }
+            };
+
+            XAxisLabels = dados.Select(p => p.DataRegistro!.Value.ToString("dd/MM/yyyy")).ToArray();
+        }
+        else
+        {
+            Series = new List<ChartSeries>();
+            XAxisLabels = Array.Empty<string>();
+        }
+    }
+
+
+    private async Task AbrirRegistrarProgresso()
+    {
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+            CloseButton = true
+        };
+        var result = await DialogService.ShowAsync<NutriFlow.Components.Dialogs.RegistrarProgressoDialog>("Registrar Progresso", options);
+        var dialogResult = await result.Result;
+
+        if (dialogResult != null && !dialogResult.Canceled)
+        {
+            await LoadData();
+            StateHasChanged();
+        }
+    }
+
+    private async Task ExcluirProgresso(NutriFlow.Models.Progresso progresso)
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Confirmar exclusão",
+            $"Deseja realmente excluir este registro de progresso de {progresso.Paciente?.Nome ?? "paciente"}?",
+            yesText: "Excluir",
+            cancelText: "Cancelar");
+
+        if (confirm != true) return;
+
+        try
+        {
+            DbContext.Progressos.Remove(progresso);
+            await DbContext.SaveChangesAsync();
+            progressos.Remove(progresso);
+            AtualizarGrafico();
+            Snackbar.Add("Progresso excluído com sucesso.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao excluir progresso: {ex.InnerException?.Message ?? ex.Message}", Severity.Error);
+        }
     }
 }
