@@ -1,0 +1,161 @@
+@using NutriFlow.Data
+@using NutriFlow.Models
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject ISnackbar Snackbar
+@inject NutriFlow.Services.AuthService AuthService
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6" Class="font-bold">Registrar Progresso</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="form" @bind-IsValid="success">
+            <MudGrid Spacing="4">
+                <MudItem xs="12">
+                    <MudSelect T="int?" @bind-Value="ProgressoModel.PacienteId" Label="Paciente *" Placeholder="Selecione o paciente"
+                               Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" RequiredError="Selecione um paciente">
+                        @foreach (var p in Pacientes)
+                        {
+                            <MudSelectItem T="int?" Value="@p.Id">@p.Nome</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudDatePicker @bind-Date="DataRegistro" Label="Data do Registro"
+                                   Variant="Variant.Outlined" Margin="Margin.Dense" DateFormat="dd/MM/yyyy" />
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudNumericField T="decimal?" @bind-Value="ProgressoModel.Peso" Label="Peso (kg)"
+                                     Placeholder="70.5" Variant="Variant.Outlined" Margin="Margin.Dense" Step="0.1M" />
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudNumericField T="decimal?" @bind-Value="ProgressoModel.PercentualGordura" Label="% Gordura"
+                                     Placeholder="25" Variant="Variant.Outlined" Margin="Margin.Dense" Step="0.1M" />
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudNumericField T="decimal?" @bind-Value="ProgressoModel.CinturaCm" Label="Cintura (cm)"
+                                     Placeholder="80" Variant="Variant.Outlined" Margin="Margin.Dense" Step="0.1M" />
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudNumericField T="decimal?" @bind-Value="ProgressoModel.QuadrilCm" Label="Quadril (cm)"
+                                     Placeholder="95" Variant="Variant.Outlined" Margin="Margin.Dense" Step="0.1M" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudSelect T="string" @bind-Value="ProgressoModel.AderenciaPlano" Label="Aderência ao Plano" Placeholder="Selecionar"
+                               Variant="Variant.Outlined" Margin="Margin.Dense">
+                        <MudSelectItem Value="@("Ruim")">Ruim</MudSelectItem>
+                        <MudSelectItem Value="@("Regular")">Regular</MudSelectItem>
+                        <MudSelectItem Value="@("Boa")">Boa</MudSelectItem>
+                        <MudSelectItem Value="@("Muito Boa")">Muito Boa</MudSelectItem>
+                        <MudSelectItem Value="@("Excelente")">Excelente</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudSelect T="string" @bind-Value="ProgressoModel.Energia" Label="Nível de Energia" Placeholder="Selecionar"
+                               Variant="Variant.Outlined" Margin="Margin.Dense">
+                        <MudSelectItem Value="@("Muito Baixa")">Muito Baixa</MudSelectItem>
+                        <MudSelectItem Value="@("Baixa")">Baixa</MudSelectItem>
+                        <MudSelectItem Value="@("Moderada")">Moderada</MudSelectItem>
+                        <MudSelectItem Value="@("Alta")">Alta</MudSelectItem>
+                        <MudSelectItem Value="@("Muito Alta")">Muito Alta</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudSelect T="string" @bind-Value="ProgressoModel.Humor" Label="Humor Geral" Placeholder="Selecionar"
+                               Variant="Variant.Outlined" Margin="Margin.Dense">
+                        <MudSelectItem Value="@("Muito Ruim")">Muito Ruim</MudSelectItem>
+                        <MudSelectItem Value="@("Ruim")">Ruim</MudSelectItem>
+                        <MudSelectItem Value="@("Neutro")">Neutro</MudSelectItem>
+                        <MudSelectItem Value="@("Bom")">Bom</MudSelectItem>
+                        <MudSelectItem Value="@("Muito Bom")">Muito Bom</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="ProgressoModel.Feedback" Label="Feedback / Observações" Lines="4"
+                                  Placeholder="Como o paciente se sentiu, dificuldades encontradas..."
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar" Variant="Variant.Outlined" Class="rounded-lg text-none px-6">Cancelar</MudButton>
+        <MudButton OnClick="Salvar" Color="Color.Success" Variant="Variant.Filled" Class="rounded-lg text-none px-6"
+                   Disabled="@IsSaving">
+            @if (IsSaving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>Salvando...</span>
+            }
+            else
+            {
+                <span>Registrar</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private MudForm form = null!;
+    private bool success;
+    private bool IsSaving;
+
+    private DateTime? DataRegistro { get; set; } = DateTime.Today;
+    private Progresso ProgressoModel { get; set; } = new();
+    private List<Paciente> Pacientes { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await AuthService.InitializeAsync();
+        if (AuthService.CurrentUser != null)
+        {
+            Pacientes = await DbContext.Pacientes
+                .Where(p => p.UsuarioId == AuthService.CurrentUser.Id)
+                .OrderBy(p => p.Nome)
+                .ToListAsync();
+        }
+    }
+
+    private async Task Salvar()
+    {
+        await form.Validate();
+        if (!success) return;
+
+        IsSaving = true;
+        try
+        {
+            ProgressoModel.DataRegistro = DataRegistro;
+            ProgressoModel.DataCriacao = DateTime.Now;
+            ProgressoModel.DataAtualizacao = DateTime.Now;
+
+            DbContext.Progressos.Add(ProgressoModel);
+            await DbContext.SaveChangesAsync();
+
+            Snackbar.Add("Progresso registrado com sucesso!", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao registrar progresso: {ex.InnerException?.Message ?? ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+}
