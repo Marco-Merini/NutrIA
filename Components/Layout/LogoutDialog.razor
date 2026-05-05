@@ -1,0 +1,38 @@
+@inject NavigationManager NavigationManager
+
+<MudDialog>
+    <DialogContent>
+        <div class="d-flex flex-column align-center pa-4" style="gap: 16px;">
+            <MudIcon Icon="@Icons.Material.Filled.Logout" Color="Color.Error" Size="Size.Large"
+                     Style="font-size: 3rem;" />
+            <MudText Typo="Typo.h6" Align="Align.Center" Class="mt-2">
+                Deseja sair da sessão?
+            </MudText>
+            <MudText Typo="Typo.body2" Align="Align.Center" Style="color: #6b7280;">
+                Você precisará informar suas credenciais novamente para acessar o sistema.
+            </MudText>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="Cancel" Class="text-none">
+            Cancelar
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Error" StartIcon="@Icons.Material.Filled.Logout"
+                   OnClick="ConfirmLogout" Class="text-none font-bold">
+            Sim, sair
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void ConfirmLogout()
+    {
+        MudDialog.Close(DialogResult.Ok(true));
+        NavigationManager.NavigateTo("/api/auth/logout", forceLoad: true);
+    }
+}
