@@ -24,6 +24,28 @@
     <Routes />
     <script src="_framework/blazor.web.js"></script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+    <script>
+        function submitLoginForm(email, senha) {
+            var form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '/api/auth/login';
+
+            var inputEmail = document.createElement('input');
+            inputEmail.type = 'hidden';
+            inputEmail.name = 'email';
+            inputEmail.value = email;
+            form.appendChild(inputEmail);
+
+            var inputSenha = document.createElement('input');
+            inputSenha.type = 'hidden';
+            inputSenha.name = 'senha';
+            inputSenha.value = senha;
+            form.appendChild(inputSenha);
+
+            document.body.appendChild(form);
+            form.submit();
+        }
+    </script>
 </body>
 
 </html>

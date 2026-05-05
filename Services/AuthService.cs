@@ -1,8 +1,10 @@
 using NutriFlow.Models;
 using NutriFlow.Data;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
-using System.Security.Cryptography;
+using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Text;
 
 namespace NutriFlow.Services
@@ -10,30 +12,16 @@ namespace NutriFlow.Services
     public class AuthService
     {
         private readonly ApplicationDbContext _dbContext;
-        private readonly ProtectedLocalStorage _localStorage;
+        private readonly AuthenticationStateProvider _authStateProvider;
+        private readonly IConfiguration _configuration;
         private Usuario? _currentUser;
-        private bool _isAuthenticated;
         private bool _isInitialized;
 
-        public event Action? AuthStateChanged;
-
-        public AuthService(ApplicationDbContext dbContext, ProtectedLocalStorage localStorage)
+        public AuthService(ApplicationDbContext dbContext, AuthenticationStateProvider authStateProvider, IConfiguration configuration)
         {
             _dbContext = dbContext;
-            _localStorage = localStorage;
-        }
-
-        public bool IsAuthenticated
-        {
-            get => _isAuthenticated;
-            private set
-            {
-                if (_isAuthenticated != value)
-                {
-                    _isAuthenticated = value;
-                    AuthStateChanged?.Invoke();
-                }
-            }
+            _authStateProvider = authStateProvider;
+            _configuration = configuration;
         }
 
         public Usuario? CurrentUser => _currentUser;
@@ -44,22 +32,21 @@ namespace NutriFlow.Services
 
             try
             {
-                var result = await _localStorage.GetAsync<int>("userId");
-                if (result.Success && result.Value > 0)
+                var authState = await _authStateProvider.GetAuthenticationStateAsync();
+                var userClaim = authState.User.FindFirst("UsuarioId")?.Value;
+                
+                if (int.TryParse(userClaim, out int userId) && userId > 0)
                 {
-                    _currentUser = await _dbContext.Usuarios.FindAsync(result.Value);
-                    if (_currentUser != null)
-                    {
-                        IsAuthenticated = true;
-                    }
+                    _currentUser = await _dbContext.Usuarios.FindAsync(userId);
+                }
+                else
+                {
+                    _currentUser = null;
                 }
             }
             catch
             {
-                // Falha ao acessar o LocalStorage.
-                // Isso pode acontecer durante o prerendering no Blazor Server
-                // ou quando o JavaScript interop ainda não está disponível.
-                // Nesse caso, a aplicação continua normalmente, apenas sem restaurar a sessão.
+                // Fallback gracefully on initialization error
             }
             finally
             {
@@ -67,20 +54,51 @@ namespace NutriFlow.Services
             }
         }
 
-        public string GenerateHash(string input)
+        public string GenerateJwtToken(Usuario user)
         {
-            if (string.IsNullOrEmpty(input)) return string.Empty;
+            var jwtSettings = _configuration.GetSection("Jwt");
+            var jwtKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY")
+                ?? throw new InvalidOperationException("JWT secret key not configured. Set the 'JWT_SECRET_KEY' environment variable.");
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+            var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-            using (SHA256 sha256Hash = SHA256.Create())
+            var claims = new List<Claim>
             {
-                byte[] bytes = sha256Hash.ComputeHash(Encoding.UTF8.GetBytes(input));
-                StringBuilder builder = new StringBuilder();
-                for (int i = 0; i < bytes.Length; i++)
-                {
-                    builder.Append(bytes[i].ToString("x2"));
-                }
-                return builder.ToString();
+                new Claim(ClaimTypes.Name, user.Nome ?? ""),
+                new Claim("UsuarioId", user.Id.ToString()),
+                new Claim(ClaimTypes.Email, user.Email ?? ""),
+                new Claim("Usu_Categoria", user.Tipo ?? "Nutricionista")
+            };
+
+            var expireHours = int.Parse(jwtSettings["ExpireHours"] ?? "24");
+
+            var token = new JwtSecurityToken(
+                issuer: jwtSettings["Issuer"],
+                audience: jwtSettings["Audience"],
+                claims: claims,
+                expires: DateTime.UtcNow.AddHours(expireHours),
+                signingCredentials: credentials
+            );
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+        public async Task<(bool Success, string? Token)> LoginAsync(string email, string senha)
+        {
+            var user = await _dbContext.Usuarios.FirstOrDefaultAsync(u => u.Email == email && u.Ativo);
+
+            if (user == null || string.IsNullOrEmpty(user.Senha))
+            {
+                return (false, null);
             }
+
+            if (!BCrypt.Net.BCrypt.Verify(senha, user.Senha))
+            {
+                return (false, null);
+            }
+
+            var token = GenerateJwtToken(user);
+            return (true, token);
         }
 
         public async Task<bool> RegisterAsync(Usuario newUser)
@@ -93,7 +111,7 @@ namespace NutriFlow.Services
                     return false;
                 }
 
-                newUser.Senha = GenerateHash(newUser.Senha);
+                newUser.Senha = BCrypt.Net.BCrypt.HashPassword(newUser.Senha);
                 
                 await _dbContext.Usuarios.AddAsync(newUser);
                 await _dbContext.SaveChangesAsync();
@@ -118,7 +136,7 @@ namespace NutriFlow.Services
                 user.Email = updatedUser.Email;
                 if (!string.IsNullOrEmpty(updatedUser.Senha) && updatedUser.Senha != user.Senha)
                 {
-                    user.Senha = GenerateHash(updatedUser.Senha);
+                    user.Senha = BCrypt.Net.BCrypt.HashPassword(updatedUser.Senha);
                 }
 
                 user.DataAtualizacao = DateTime.Now;
@@ -137,61 +155,6 @@ namespace NutriFlow.Services
             {
                 Console.WriteLine($"Erro ao editar perfil: {ex.Message}");
                 return false;
-            }
-        }
-
-        public async Task<bool> LoginAsync(string nome, string senha)
-        {
-            try
-            {
-                string hashedSenha = GenerateHash(senha);
-                var user = await _dbContext.Usuarios.FirstOrDefaultAsync(
-                    u => u.Nome == nome && u.Senha == hashedSenha && u.Ativo == true
-                );
-
-                if (user != null)
-                {
-                    _currentUser = user;
-                    IsAuthenticated = true;
-
-                    try
-                    {
-                        await _localStorage.SetAsync("userId", user.Id);
-                    }
-                    catch
-                    {
-                        // Falha ao salvar o userId no LocalStorage.
-                        // O usuário continuará autenticado na sessão atual,
-                        // mas o login não será mantido após recarregar a página.
-                    }
-
-                    return true;
-                }
-
-                return false;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Erro no login: {ex.Message}");
-                return false;
-            }
-        }
-
-        public async Task LogoutAsync()
-        {
-            _currentUser = null;
-            IsAuthenticated = false;
-            _isInitialized = false;
-
-            try
-            {
-                await _localStorage.DeleteAsync("userId");
-            }
-            catch
-            {
-                // Falha ao remover o userId do LocalStorage.
-                // Isso não impede o logout em memória,
-                // mas pode fazer com que a sessão antiga permaneça salva no navegador.
             }
         }
     }
