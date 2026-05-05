@@ -40,9 +40,7 @@ builder.Services.AddScoped<AIService>(sp => new AIService(
 
 // JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("Jwt");
-var jwtKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY")
-    ?? throw new InvalidOperationException("JWT secret key not configured. Set the 'JWT_SECRET_KEY' environment variable.");
-var key = Encoding.UTF8.GetBytes(jwtKey);
+var key = JwtKeyProvider.GetKey(builder.Configuration);
 var expireHours = int.Parse(jwtSettings["ExpireHours"] ?? "24");
 
 builder.Services.AddAuthentication(options =>

@@ -57,9 +57,7 @@ namespace NutriFlow.Services
         public string GenerateJwtToken(Usuario user)
         {
             var jwtSettings = _configuration.GetSection("Jwt");
-            var jwtKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY")
-                ?? throw new InvalidOperationException("JWT secret key not configured. Set the 'JWT_SECRET_KEY' environment variable.");
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+            var key = new SymmetricSecurityKey(JwtKeyProvider.GetKey(_configuration));
             var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
             var claims = new List<Claim>
