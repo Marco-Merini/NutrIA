@@ -1,5 +1,12 @@
 @page "/ia"
+@attribute [Authorize]
+@rendermode InteractiveServer
 @inject ISnackbar Snackbar
+@inject NutriFlow.Data.ApplicationDbContext DbContext
+@inject NutriFlow.Services.AIService AIService
+@inject NutriFlow.Services.AuthService AuthService
+@using Microsoft.EntityFrameworkCore
+@using NutriFlow.Models
 
 <PageTitle>Assistente RAG - NutriAI</PageTitle>
 
@@ -11,46 +18,103 @@
     <MudText Typo="Typo.body2" Style="color: #6b7280;">Busca vetorial semântica sobre o histórico dos pacientes</MudText>
 </div>
 
-<!-- Selector -->
-<div class="mb-8">
-    <MudSelect T="int" @bind-Value="selectedPacienteId" Placeholder="Selecione o paciente" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter" Class="bg-white rounded-lg">
+<!-- Selector + Indexar -->
+<div class="d-flex align-center gap-3 mb-6">
+    <MudSelect T="int" @bind-Value="selectedPacienteId" Placeholder="Selecione o paciente" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter" Class="bg-white rounded-lg" Style="flex: 1;">
         @foreach (var p in pacientes)
         {
             <MudSelectItem Value="@p.Id">@p.Nome</MudSelectItem>
         }
     </MudSelect>
+    <MudButton OnClick="IndexarPaciente" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Storage"
+               Style="background: linear-gradient(135deg, #a855f7, #7c3aed); color: white; height: 56px; border-radius: 12px; text-transform: none; font-weight: 600;"
+               Disabled="@(isIndexing || selectedPacienteId == 0)">
+        @if (isIndexing)
+        {
+            <MudProgressCircular Size="Size.Small" Color="Color.Default" Indeterminate="true" Class="mr-2" />
+            <span>Indexando paciente...</span>
+        }
+        else
+        {
+            <span>Indexar Selecionado</span>
+        }
+    </MudButton>
 </div>
 
+@if (indexedPacienteNome != null)
+{
+    <MudAlert Severity="Severity.Success" Variant="Variant.Text" Dense="true" Class="mb-4" Style="border-radius: 8px;">
+        <b>@indexedPacienteNome</b> indexado com sucesso — @AIService.IndexedChunks.Count blocos vetorizados via FAISS
+    </MudAlert>
+}
+
 <!-- Chat Area -->
-<div class="d-flex flex-column" style="min-height: calc(100vh - 350px); justify-content: space-between;">
+<div class="d-flex flex-column" style="min-height: calc(100vh - 420px); justify-content: space-between;">
     <!-- Messages -->
-    <div class="d-flex flex-column gap-4">
-        <div class="d-flex gap-3">
-            <MudAvatar Style="background-color: #f3e8ff; color: #a855f7; width: 32px; height: 32px;" Class="mt-1">
-                <MudIcon Icon="@Icons.Material.Filled.Psychology" Size="Size.Small" />
-            </MudAvatar>
-            <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid #e5e7eb; border-radius: 12px; border-top-left-radius: 4px; max-width: 85%;">
-                <MudText Typo="Typo.body2" Style="color: #374151; line-height: 1.6;">
-                    Olá! Sou o assistente IA nutricional. Para começar, selecione um paciente e clique em <b>Indexar</b> para carregar os dados no sistema de busca vetorial. Depois farei perguntas baseadas no histórico real do paciente.
-                </MudText>
-            </MudPaper>
-        </div>
+    <div class="d-flex flex-column gap-4" style="overflow-y: auto; max-height: calc(100vh - 520px); padding-right: 4px;">
+        @foreach (var msg in chatMessages)
+        {
+            @if (msg.IsBot)
+            {
+                <!-- Bot message -->
+                <div class="d-flex gap-3">
+                    <MudAvatar Style="background-color: #f3e8ff; color: #a855f7; width: 32px; height: 32px;" Class="mt-1">
+                        <MudIcon Icon="@Icons.Material.Filled.Psychology" Size="Size.Small" />
+                    </MudAvatar>
+                    <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid #e5e7eb; border-radius: 12px; border-top-left-radius: 4px; max-width: 85%;">
+                        <MudText Typo="Typo.body2" Style="color: #374151; line-height: 1.6; white-space: pre-wrap;">
+                            @msg.Text
+                        </MudText>
+                    </MudPaper>
+                </div>
+            }
+            else
+            {
+                <!-- User message -->
+                <div class="d-flex gap-3 justify-end">
+                    <MudPaper Elevation="0" Class="pa-4" Style="background: linear-gradient(135deg, #a855f7, #7c3aed); border-radius: 12px; border-top-right-radius: 4px; max-width: 85%;">
+                        <MudText Typo="Typo.body2" Style="color: white; line-height: 1.6;">
+                            @msg.Text
+                        </MudText>
+                    </MudPaper>
+                    <MudAvatar Style="background-color: #e0f2fe; color: #0284c7; width: 32px; height: 32px;" Class="mt-1">
+                        <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" />
+                    </MudAvatar>
+                </div>
+            }
+        }
+
+        @if (isThinking)
+        {
+            <div class="d-flex gap-3">
+                <MudAvatar Style="background-color: #f3e8ff; color: #a855f7; width: 32px; height: 32px;" Class="mt-1">
+                    <MudIcon Icon="@Icons.Material.Filled.Psychology" Size="Size.Small" />
+                </MudAvatar>
+                <MudPaper Elevation="0" Class="pa-4 d-flex align-center gap-2" Style="border: 1px solid #e5e7eb; border-radius: 12px; border-top-left-radius: 4px;">
+                    <MudProgressCircular Size="Size.Small" Color="Color.Secondary" Indeterminate="true" />
+                    <MudText Typo="Typo.body2" Style="color: #9ca3af;">Analisando dados vetorizados...</MudText>
+                </MudPaper>
+            </div>
+        }
     </div>
 
     <!-- Bottom Input Area -->
     <div class="mt-auto pt-6">
         <!-- Suggestion Chips -->
         <div class="d-flex flex-wrap gap-2 mb-4">
-            <MudChip T="string" Style="background-color: #f3f4f6; color: #6b7280; font-weight: 500;" Class="rounded-pill px-3 py-1 border-0" Variant="Variant.Filled">Qual a evolução do peso do paciente?</MudChip>
-            <MudChip T="string" Style="background-color: #f3f4f6; color: #6b7280; font-weight: 500;" Class="rounded-pill px-3 py-1 border-0" Variant="Variant.Filled">Como está a aderência ao plano alimentar?</MudChip>
-            <MudChip T="string" Style="background-color: #f3f4f6; color: #6b7280; font-weight: 500;" Class="rounded-pill px-3 py-1 border-0" Variant="Variant.Filled">Quais são as restrições alimentares do paciente?</MudChip>
-            <MudChip T="string" Style="background-color: #f3f4f6; color: #6b7280; font-weight: 500;" Class="rounded-pill px-3 py-1 border-0" Variant="Variant.Filled">Resumo das últimas sessões</MudChip>
+            <MudChip T="string" OnClick="@(() => UseSuggestion("Qual a evolução do peso do paciente?"))" Style="background-color: #f3f4f6; color: #6b7280; font-weight: 500; cursor: pointer;" Class="rounded-pill px-3 py-1 border-0" Variant="Variant.Filled">Qual a evolução do peso do paciente?</MudChip>
+            <MudChip T="string" OnClick="@(() => UseSuggestion("Como está a aderência ao plano alimentar?"))" Style="background-color: #f3f4f6; color: #6b7280; font-weight: 500; cursor: pointer;" Class="rounded-pill px-3 py-1 border-0" Variant="Variant.Filled">Como está a aderência ao plano alimentar?</MudChip>
+            <MudChip T="string" OnClick="@(() => UseSuggestion("Quais são as restrições alimentares do paciente?"))" Style="background-color: #f3f4f6; color: #6b7280; font-weight: 500; cursor: pointer;" Class="rounded-pill px-3 py-1 border-0" Variant="Variant.Filled">Quais são as restrições alimentares do paciente?</MudChip>
+            <MudChip T="string" OnClick="@(() => UseSuggestion("Resumo das últimas sessões"))" Style="background-color: #f3f4f6; color: #6b7280; font-weight: 500; cursor: pointer;" Class="rounded-pill px-3 py-1 border-0" Variant="Variant.Filled">Resumo das últimas sessões</MudChip>
         </div>
 
         <!-- Input Field & Send Button -->
         <div class="d-flex align-stretch gap-3">
-            <MudTextField @bind-Value="userMessage" Placeholder="Faça uma pergunta sobre o paciente... (Enter para enviar)" Variant="Variant.Outlined" Class="bg-white flex-grow-1" Style="border-radius: 8px;" />
-            <MudIconButton Icon="@Icons.Material.Filled.Send" Style="background-color: #8ae4b9; color: white; width: 56px; height: 56px; border-radius: 8px;" Class="mt-1" />
+            <MudTextField @bind-Value="userMessage" Immediate="true" Placeholder="Faça uma pergunta sobre o paciente... (Enter para enviar)" Variant="Variant.Outlined" Class="bg-white flex-grow-1" Style="border-radius: 8px;"
+                          OnKeyDown="HandleKeyDown" Disabled="@isThinking" />
+            <MudIconButton Icon="@Icons.Material.Filled.Send"
+                           Style="background-color: #8ae4b9; color: white; width: 56px; height: 56px; border-radius: 8px;"
+                           Class="mt-1" OnClick="SendMessage" Disabled="@(isThinking || string.IsNullOrWhiteSpace(userMessage))" />
         </div>
     </div>
 </div>
@@ -58,17 +122,134 @@
 @code {
     private int selectedPacienteId;
     private string userMessage = "";
+    private bool isIndexing;
+    private bool isThinking;
+    private string? indexedPacienteNome;
 
-    private List<PacienteViewModel> pacientes = new()
-    {
-        new() { Id = 1, Nome = "Ana Paula Ferreira" },
-        new() { Id = 2, Nome = "Carlos Eduardo Silva" },
-        new() { Id = 3, Nome = "Mariana Costa" }
-    };
+    private List<Paciente> pacientes = new();
+    private List<ChatMsg> chatMessages = new();
 
-    public class PacienteViewModel
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        public int Id { get; set; }
-        public string Nome { get; set; } = "";
+        if (firstRender)
+        {
+            await AuthService.InitializeAsync();
+            var userId = AuthService.CurrentUser?.Id;
+
+            if (userId != null)
+            {
+                pacientes = await DbContext.Pacientes
+                    .AsNoTracking()
+                    .Where(p => p.UsuarioId == userId)
+                    .Include(p => p.Sessoes)
+                    .Include(p => p.Progressos)
+                    .Include(p => p.PlanosDieta)
+                    .OrderBy(p => p.Nome)
+                    .ToListAsync();
+            }
+
+            // Mensagem inicial do bot
+            chatMessages.Add(new ChatMsg
+            {
+                IsBot = true,
+                Text = "Olá! Sou o assistente IA nutricional com busca vetorial RAG.\n\nPara começar:\n1. Selecione um paciente na lista acima\n2. Clique em \"Indexar Selecionado\" para vetorizar todo o histórico focado do paciente via FAISS\n3. Depois, faça perguntas específicas baseadas nos dados atualizados do seu paciente!"
+            });
+
+            StateHasChanged();
+        }
+    }
+
+    private async Task IndexarPaciente()
+    {
+        if (selectedPacienteId == 0) return;
+
+        isIndexing = true;
+        StateHasChanged();
+
+        try
+        {
+            var paciente = pacientes.FirstOrDefault(p => p.Id == selectedPacienteId);
+            if (paciente == null)
+            {
+                Snackbar.Add("Paciente não encontrado.", Severity.Error);
+                return;
+            }
+
+            await AIService.IndexPacienteAsync(paciente);
+            indexedPacienteNome = paciente.Nome;
+
+            chatMessages.Add(new ChatMsg
+            {
+                IsBot = true,
+                Text = $"✅ Histórico de \"{paciente.Nome}\" indexado com sucesso!\n\n📊 {AIService.IndexedChunks.Count} blocos de informação focados neste paciente foram vetorizados no banco FAISS.\n\nAgora você pode me fazer perguntas profundas com total certeza de retorno!"
+            });
+
+            Snackbar.Add($"Paciente {paciente.Nome} indexado com sucesso!", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao indexar: {ex.Message}", Severity.Error);
+            chatMessages.Add(new ChatMsg
+            {
+                IsBot = true,
+                Text = $"❌ Erro ao indexar o paciente selecionado: {ex.Message}"
+            });
+        }
+        finally
+        {
+            isIndexing = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+        {
+            await SendMessage();
+        }
+    }
+
+    private async Task UseSuggestion(string suggestion)
+    {
+        userMessage = suggestion;
+        await SendMessage();
+    }
+
+    private async Task SendMessage()
+    {
+        var msg = userMessage?.Trim();
+        if (string.IsNullOrWhiteSpace(msg)) return;
+
+        // Add user message
+        chatMessages.Add(new ChatMsg { IsBot = false, Text = msg });
+        userMessage = "";
+        isThinking = true;
+        StateHasChanged();
+
+        try
+        {
+            var response = await AIService.AskQuestionAsync(msg);
+            chatMessages.Add(new ChatMsg { IsBot = true, Text = response });
+        }
+        catch (Exception ex)
+        {
+            chatMessages.Add(new ChatMsg
+            {
+                IsBot = true,
+                Text = $"❌ Erro ao processar a pergunta: {ex.Message}"
+            });
+        }
+        finally
+        {
+            isThinking = false;
+            StateHasChanged();
+        }
+    }
+
+    public class ChatMsg
+    {
+        public bool IsBot { get; set; }
+        public string Text { get; set; } = "";
     }
 }

@@ -1,6 +1,7 @@
 @rendermode InteractiveServer
 @inject NutriFlow.Services.AuthService AuthService
 @inject NavigationManager NavigationManager
+@inject IDialogService DialogService
 
 <div class="d-flex flex-column" style="height: calc(100vh - 100px);">
     <MudNavMenu Class="nutri-nav-menu mt-2" Style="flex-grow: 1;">
@@ -13,16 +14,23 @@
     </MudNavMenu>
 
     <div class="px-4 pb-4 mt-auto">
-        <MudButton Variant="Variant.Text" Color="Color.Error" StartIcon="@Icons.Material.Filled.Logout" FullWidth="true" Class="justify-start text-none py-2 font-bold" OnClick="LogoutAsync">
+        <MudButton Variant="Variant.Text" Color="Color.Error" StartIcon="@Icons.Material.Filled.Logout" FullWidth="true" Class="justify-start text-none py-2 font-bold" OnClick="OpenLogoutDialog">
             Sair
         </MudButton>
     </div>
 </div>
 
 @code {
-    private async Task LogoutAsync()
+    private async Task OpenLogoutDialog()
     {
-        await AuthService.LogoutAsync();
-        NavigationManager.NavigateTo("/", forceLoad: true);
+        var options = new DialogOptions
+        {
+            CloseOnEscapeKey = true,
+            CloseButton = true,
+            MaxWidth = MaxWidth.ExtraSmall,
+            FullWidth = true
+        };
+
+        await DialogService.ShowAsync<LogoutDialog>("Confirmar Saída", options);
     }
 }

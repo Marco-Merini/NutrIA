@@ -1,6 +1,13 @@
 @page "/home"
+@rendermode InteractiveServer
+@using NutriFlow.Data
+@using NutriFlow.Models
 @using NutriFlow.Services
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
+@attribute [Authorize]
 
 <PageTitle>Dashboard - NutriAI</PageTitle>
 
@@ -85,20 +92,28 @@
             </div>
             
             <div class="d-flex flex-column gap-3">
-                @foreach (var p in pacientesRecentes)
+                @if (pacientesRecentes.Any())
                 {
-                    <div class="d-flex justify-space-between align-center p-3 rounded-lg" style="background-color: #f9fafb;">
-                        <div class="d-flex align-center gap-3">
-                            <div class="avatar-initials">
-                                @(string.IsNullOrEmpty(p.Nome) ? "?" : p.Nome.Substring(0, 1).ToUpper())
+                    @foreach (var p in pacientesRecentes)
+                    {
+                        <div class="d-flex justify-space-between align-center p-3 rounded-lg" style="background-color: #f9fafb; cursor: pointer;"
+                             @onclick="@(() => NavigationManager.NavigateTo($"/pacientes/{p.Id}"))">
+                            <div class="d-flex align-center gap-3">
+                                <div class="avatar-initials">
+                                    @(string.IsNullOrEmpty(p.Nome) ? "?" : p.Nome.Substring(0, 1).ToUpper())
+                                </div>
+                                <div>
+                                    <MudText Typo="Typo.body2" Class="font-bold">@p.Nome</MudText>
+                                    <MudText Typo="Typo.caption" Style="color: #6b7280;">@(string.IsNullOrEmpty(p.Objetivo) ? "Geral" : p.Objetivo)</MudText>
+                                </div>
                             </div>
-                            <div>
-                                <MudText Typo="Typo.body2" Class="font-bold">@p.Nome</MudText>
-                                <MudText Typo="Typo.caption" Style="color: #6b7280;">@p.Objetivo</MudText>
-                            </div>
+                            <span class="status-badge @(p.Status == "ativo" ? "ativo" : "")">@(p.Status ?? "ativo")</span>
                         </div>
-                        <span class="status-badge ativo">ativo</span>
-                    </div>
+                    }
+                }
+                else
+                {
+                    <MudText Typo="Typo.caption" Class="text-center pa-4" Style="color: #94a3b8;">Nenhum paciente cadastrado.</MudText>
                 }
             </div>
         </MudPaper>
@@ -113,19 +128,26 @@
             </div>
 
             <div class="d-flex flex-column gap-3">
-                @foreach (var s in sessoesRecentes)
+                @if (sessoesRecentes.Any())
                 {
-                    <div class="d-flex align-center p-3 rounded-lg gap-3" style="background-color: #f9fafb;">
-                        <div class="stat-icon-wrapper icon-blue" style="width: 40px; height: 40px;">
-                            <MudIcon Icon="@Icons.Material.Filled.EventNote" Size="Size.Small" />
+                    @foreach (var s in sessoesRecentes)
+                    {
+                        <div class="d-flex align-center p-3 rounded-lg gap-3" style="background-color: #f9fafb;">
+                            <div class="stat-icon-wrapper icon-blue" style="width: 40px; height: 40px;">
+                                <MudIcon Icon="@Icons.Material.Filled.EventNote" Size="Size.Small" />
+                            </div>
+                            <div>
+                                <MudText Typo="Typo.body2" Class="font-bold">@(s.Paciente?.Nome ?? "-")</MudText>
+                                <MudText Typo="Typo.caption" Style="color: #6b7280;">
+                                    @(s.DataSessao?.ToString("dd/MM/yyyy") ?? "-") · @(s.Tipo ?? "-")
+                                </MudText>
+                            </div>
                         </div>
-                        <div>
-                            <MudText Typo="Typo.body2" Class="font-bold">@s.PacienteNome</MudText>
-                            <MudText Typo="Typo.caption" Style="color: #6b7280;">
-                                @s.Data.ToString("yyyy-MM-dd") · @s.Tipo
-                            </MudText>
-                        </div>
-                    </div>
+                    }
+                }
+                else
+                {
+                    <MudText Typo="Typo.caption" Class="text-center pa-4" Style="color: #94a3b8;">Nenhuma sessão registrada.</MudText>
                 }
             </div>
         </MudPaper>
@@ -133,41 +155,74 @@
 </MudGrid>
 
 @code {
-    private int pacientesCount = 3;
-    private int planosCount = 2;
-    private int progressosCount = 5;
-    private int sessoesCount = 3;
+    private int pacientesCount;
+    private int planosCount;
+    private int progressosCount;
+    private int sessoesCount;
 
-    private List<PacienteResumo> pacientesRecentes = new()
-    {
-        new() { Nome = "Ana Paula Ferreira", Objetivo = "perda peso", Status = "ativo" },
-        new() { Nome = "Carlos Eduardo Silva", Objetivo = "ganho massa", Status = "ativo" },
-        new() { Nome = "Mariana Costa", Objetivo = "saude geral", Status = "ativo" }
-    };
+    private List<Paciente> pacientesRecentes = new();
+    private List<Sessao> sessoesRecentes = new();
 
-    private List<SessaoResumo> sessoesRecentes = new()
-    {
-        new() { PacienteNome = "Ana Paula Ferreira", Data = new DateTime(2025, 03, 15), Tipo = "retorno" },
-        new() { PacienteNome = "Ana Paula Ferreira", Data = new DateTime(2025, 03, 01), Tipo = "consulta inicial" },
-        new() { PacienteNome = "Carlos Eduardo Silva", Data = new DateTime(2025, 03, 01), Tipo = "consulta inicial" }
-    };
+    [CascadingParameter]
+    private Task<AuthenticationState> authenticationStateTask { get; set; } = default!;
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        await Task.Delay(100);
+        if (firstRender)
+        {
+            await LoadDashboardData();
+            StateHasChanged();
+        }
     }
 
-    public class PacienteResumo
+    private async Task LoadDashboardData()
     {
-        public string Nome { get; set; } = "";
-        public string Objetivo { get; set; } = "";
-        public string Status { get; set; } = "";
-    }
+        try
+        {
+            var authState = await authenticationStateTask;
+            var userIdStr = authState.User.FindFirst("UsuarioId")?.Value;
+            if (!int.TryParse(userIdStr, out var userId)) return;
 
-    public class SessaoResumo
-    {
-        public string PacienteNome { get; set; } = "";
-        public DateTime Data { get; set; }
-        public string Tipo { get; set; } = "";
+            // IDs dos pacientes do usuário
+            var pacienteIds = await DbContext.Pacientes
+                .Where(p => p.UsuarioId == userId)
+                .Select(p => p.Id)
+                .ToListAsync();
+
+            // Contadores
+            pacientesCount = pacienteIds.Count;
+
+            planosCount = await DbContext.PlanosDieta
+                .Where(pd => pd.PacienteId != null && pacienteIds.Contains(pd.PacienteId.Value))
+                .CountAsync();
+
+            progressosCount = await DbContext.Progressos
+                .Where(pr => pr.PacienteId != null && pacienteIds.Contains(pr.PacienteId.Value))
+                .CountAsync();
+
+            sessoesCount = await DbContext.Sessoes
+                .Where(s => s.PacienteId != null && pacienteIds.Contains(s.PacienteId.Value))
+                .CountAsync();
+
+            // Pacientes recentes (últimos 5)
+            pacientesRecentes = await DbContext.Pacientes
+                .Where(p => p.UsuarioId == userId)
+                .OrderByDescending(p => p.DataCadastro)
+                .Take(3)
+                .ToListAsync();
+
+            // Sessões recentes (últimas 5)
+            sessoesRecentes = await DbContext.Sessoes
+                .Include(s => s.Paciente)
+                .Where(s => s.PacienteId != null && pacienteIds.Contains(s.PacienteId.Value))
+                .OrderByDescending(s => s.DataSessao)
+                .Take(3)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro ao carregar dashboard: {ex.InnerException?.Message ?? ex.Message}");
+            Snackbar.Add("Erro ao carregar dados do dashboard.", Severity.Error);
+        }
     }
 }

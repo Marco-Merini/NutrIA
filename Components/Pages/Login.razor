@@ -1,7 +1,9 @@
 @page "/"
+@using Microsoft.AspNetCore.Components.Web
 @rendermode InteractiveServer
 @layout NutriFlow.Components.Layout.AuthLayout
 @inject NavigationManager Navigation
+@inject NutriFlow.Services.AuthService AuthService
 @inject ISnackbar Snackbar
 
 <PageTitle>Login - NutriAI</PageTitle>
@@ -10,21 +12,26 @@
     <div class="d-flex justify-center mb-4">
         <MudIcon Icon="@Icons.Material.Filled.Spa" Color="Color.Success" Size="Size.Large" />
     </div>
-    
+
     <MudText Typo="Typo.h5" Align="Align.Center" Class="mb-1 font-bold">Bem-vindo(a)</MudText>
     <MudText Typo="Typo.body2" Align="Align.Center" Style="color: #6b7280;" Class="mb-6">Faça login para acessar o NutriAI</MudText>
 
-    <form method="post" action="/api/auth/login" class="w-100">
+    <MudForm @ref="form" @bind-IsValid="@success" @bind-Errors="@errors">
         <MudTextField T="string" @bind-Value="nome" Label="Nome" InputType="InputType.Text" Required="true" RequiredError="O nome é obrigatório" Variant="Variant.Outlined" Class="mb-4 bg-white" />
-        <input type="hidden" name="nome" value="@nome" />
+        <MudTextField T="string" @bind-Value="senha" Label="Senha" InputType="InputType.Password" Required="true" RequiredError="A senha é obrigatória" Variant="Variant.Outlined" Class="mb-6 bg-white" OnKeyDown="HandleKeyDown" />
 
-        <MudTextField T="string" @bind-Value="senha" Label="Senha" InputType="InputType.Password" Required="true" RequiredError="A senha é obrigatória" Variant="Variant.Outlined" Class="mb-6 bg-white" />
-        <input type="hidden" name="senha" value="@senha" />
-        
-        <button type="submit" class="mud-button-root mud-button mud-button-filled mud-button-filled-primary mud-button-filled-size-large mud-width-full mud-ripple rounded-lg py-3 font-bold text-white mb-2" style="width: 100%;">
-            Entrar
-        </button>
-    </form>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" FullWidth="true" OnClick="DoLogin" Disabled="@isLoading" Class="rounded-lg py-3 font-bold text-white">
+            @if (isLoading)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">Entrando...</MudText>
+            }
+            else
+            {
+                <text>Entrar</text>
+            }
+        </MudButton>
+    </MudForm>
 
     <div class="d-flex justify-center mt-6">
         <MudText Typo="Typo.body2" Style="color: #6b7280;">Não tem uma conta? <MudLink Href="/cadastro" Color="Color.Primary" Underline="Underline.None" Class="font-bold">Cadastre-se</MudLink></MudText>
@@ -32,17 +39,41 @@
 </MudPaper>
 
 @code {
-    [SupplyParameterFromQuery]
-    public int? error { get; set; }
+    MudForm form;
+    bool success;
+    string[] errors = { };
 
     private string nome = "";
     private string senha = "";
+    private bool isLoading;
 
-    protected override void OnInitialized()
+    private async Task HandleKeyDown(KeyboardEventArgs e)
     {
-        if (error == 1)
+        if (e.Key == "Enter")
         {
-            Snackbar.Add("Nome ou senha incorretos.", Severity.Error);
+            await DoLogin();
+        }
+    }
+
+    private async Task DoLogin()
+    {
+        await form.Validate();
+        if (form.IsValid)
+        {
+            isLoading = true;
+
+            var (loginSuccess, _) = await AuthService.LoginAsync(nome, senha);
+            if (loginSuccess)
+            {
+                Snackbar.Add("Login efetuado com sucesso!", Severity.Success);
+                Navigation.NavigateTo("/home");
+            }
+            else
+            {
+                Snackbar.Add("Nome ou senha incorretos.", Severity.Error);
+            }
+
+            isLoading = false;
         }
     }
 }

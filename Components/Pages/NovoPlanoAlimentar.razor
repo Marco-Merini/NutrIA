@@ -1,4 +1,5 @@
 @page "/planos/novo"
+@attribute [Authorize]
 @rendermode InteractiveServer
 @using NutriFlow.Data
 @using NutriFlow.Models
@@ -190,14 +191,10 @@
         if (firstRender)
         {
             await AuthService.InitializeAsync();
-            if (AuthService.CurrentUser == null)
-            {
-                NavigationManager.NavigateTo("/");
-                return;
-            }
+
 
             Pacientes = await DbContext.Pacientes
-                .Where(p => p.UsuarioId == AuthService.CurrentUser.Id)
+                .Where(p => p.UsuarioId == AuthService.CurrentUser!.Id)
                 .OrderBy(p => p.Nome)
                 .ToListAsync();
 
