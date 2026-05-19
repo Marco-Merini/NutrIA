@@ -4,8 +4,7 @@
 		<TargetFramework>net8.0</TargetFramework>
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
-	  <UserSecretsId>94f52004-df8f-4e22-8421-df7e336286d0</UserSecretsId>
-  </PropertyGroup>
+	</PropertyGroup>
 
 	<ItemGroup>
 		<PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />

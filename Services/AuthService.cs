@@ -34,7 +34,7 @@ namespace NutriFlow.Services
             {
                 var authState = await _authStateProvider.GetAuthenticationStateAsync();
                 var userClaim = authState.User.FindFirst("UsuarioId")?.Value;
-                
+
                 if (int.TryParse(userClaim, out int userId) && userId > 0)
                 {
                     _currentUser = await _dbContext.Usuarios.FindAsync(userId);
@@ -57,7 +57,7 @@ namespace NutriFlow.Services
         public string GenerateJwtToken(Usuario user)
         {
             var jwtSettings = _configuration.GetSection("Jwt");
-            var key = new SymmetricSecurityKey(JwtKeyProvider.GetKey(_configuration));
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"]!));
             var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
             var claims = new List<Claim>
@@ -83,7 +83,7 @@ namespace NutriFlow.Services
 
         public async Task<(bool Success, string? Token)> LoginAsync(string email, string senha)
         {
-            var user = await _dbContext.Usuarios.FirstOrDefaultAsync(u => u.Email == email && u.Ativo);
+            var user = await _dbContext.Usuarios.FirstOrDefaultAsync(u => u.Email == email && u.Ativo == true);
 
             if (user == null || string.IsNullOrEmpty(user.Senha))
             {
@@ -110,7 +110,7 @@ namespace NutriFlow.Services
                 }
 
                 newUser.Senha = BCrypt.Net.BCrypt.HashPassword(newUser.Senha);
-                
+
                 await _dbContext.Usuarios.AddAsync(newUser);
                 await _dbContext.SaveChangesAsync();
 
@@ -138,7 +138,7 @@ namespace NutriFlow.Services
                 }
 
                 user.DataAtualizacao = DateTime.Now;
-                
+
                 _dbContext.Usuarios.Update(user);
                 await _dbContext.SaveChangesAsync();
 

@@ -40,7 +40,7 @@ builder.Services.AddScoped<AIService>(sp => new AIService(
 
 // JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("Jwt");
-var key = JwtKeyProvider.GetKey(builder.Configuration);
+var key = Encoding.UTF8.GetBytes(jwtSettings["Key"]!);
 var expireHours = int.Parse(jwtSettings["ExpireHours"] ?? "24");
 
 builder.Services.AddAuthentication(options =>

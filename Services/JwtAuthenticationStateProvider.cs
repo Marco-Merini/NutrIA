@@ -8,7 +8,7 @@ namespace NutriFlow.Services
     public class JwtAuthenticationStateProvider : AuthenticationStateProvider
     {
         private readonly IHttpContextAccessor _httpContextAccessor;
-        private readonly ClaimsPrincipal _anonymous = new ClaimsPrincipal(new ClaimsIdentity());
+        private ClaimsPrincipal _anonymous = new ClaimsPrincipal(new ClaimsIdentity());
 
         public JwtAuthenticationStateProvider(IHttpContextAccessor httpContextAccessor)
         {
@@ -37,7 +37,7 @@ namespace NutriFlow.Services
             }
 
             // Check if token is expired
-            var expClaim = claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Exp 
+            var expClaim = claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Exp
                 || c.Type == "exp");
             if (expClaim != null && long.TryParse(expClaim.Value, out long expUnix))
             {
@@ -58,7 +58,7 @@ namespace NutriFlow.Services
             NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
         }
 
-        private static IEnumerable<Claim>? ParseClaimsFromJwt(string jwt)
+        private IEnumerable<Claim>? ParseClaimsFromJwt(string jwt)
         {
             try
             {
