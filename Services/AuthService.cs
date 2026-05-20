@@ -57,7 +57,10 @@ namespace NutriFlow.Services
         public string GenerateJwtToken(Usuario user)
         {
             var jwtSettings = _configuration.GetSection("Jwt");
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"]!));
+            var jwtKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY")
+                ?? _configuration.GetValue<string>("Jwt:Key")
+                ?? throw new InvalidOperationException("JWT secret key is not configured. Set the JWT_SECRET_KEY environment variable or use 'dotnet user-secrets'.");
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
             var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
             var claims = new List<Claim>
@@ -83,7 +86,7 @@ namespace NutriFlow.Services
 
         public async Task<(bool Success, string? Token)> LoginAsync(string email, string senha)
         {
-            var user = await _dbContext.Usuarios.FirstOrDefaultAsync(u => u.Email == email && u.Ativo == true);
+            var user = await _dbContext.Usuarios.FirstOrDefaultAsync(u => u.Email == email && u.Ativo == "S");
 
             if (user == null || string.IsNullOrEmpty(user.Senha))
             {
