@@ -23,7 +23,7 @@ namespace NutriFlow.Models
         public string? Tipo { get; set; }
 
         [Column("ativo")]
-        public bool Ativo { get; set; }
+        public string Ativo { get; set; }
 
         [Column("data_criacao")]
         public DateTime? DataCriacao { get; set; }
