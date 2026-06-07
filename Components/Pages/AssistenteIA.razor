@@ -161,19 +161,19 @@
         <div class="mb-3">
             <MudText Typo="Typo.body2" Style="color: #64748b; font-weight: 600;" Class="mb-2">💡 Sugestões do que você pode perguntar:</MudText>
             <div class="d-flex flex-wrap gap-2">
-                <MudChip T="string" OnClick="@(() => UseSuggestion("Qual a evolução do peso do Lucas nos últimos 3 meses?"))"
+                <MudChip T="string" OnClick="@(() => UseSuggestion($"Qual a evolução do peso do {GetSelectedPacienteName()} nos últimos 3 meses?"))"
                          Style="background-color: #f1f5f9; color: #475569; font-weight: 600; cursor: pointer; font-size:0.8rem; border: 1px solid #e2e8f0; border-radius: 8px;"
                          Variant="Variant.Filled">📈 Evolução do peso</MudChip>
-                <MudChip T="string" OnClick="@(() => UseSuggestion("Gere um plano alimentar semanal de 7 dias respeitando as restrições e preferências do Lucas."))"
+                <MudChip T="string" OnClick="@(() => UseSuggestion($"Gere um plano alimentar semanal de 7 dias respeitando as restrições e preferências do {GetSelectedPacienteName()}."))"
                          Style="background-color: #f1f5f9; color: #475569; font-weight: 600; cursor: pointer; font-size:0.8rem; border: 1px solid #e2e8f0; border-radius: 8px;"
                          Variant="Variant.Filled">🥗 Gerar plano 7 dias</MudChip>
-                <MudChip T="string" OnClick="@(() => UseSuggestion("Quais são as restrições alimentares e alergias do Lucas?"))"
+                <MudChip T="string" OnClick="@(() => UseSuggestion($"Quais são as restrições alimentares e alergias do {GetSelectedPacienteName()}?"))"
                          Style="background-color: #f1f5f9; color: #475569; font-weight: 600; cursor: pointer; font-size:0.8rem; border: 1px solid #e2e8f0; border-radius: 8px;"
                          Variant="Variant.Filled">⚠️ Restrições e alergias</MudChip>
-                <MudChip T="string" OnClick="@(() => UseSuggestion("Resuma as últimas sessões de consulta e o progresso geral do Lucas."))"
+                <MudChip T="string" OnClick="@(() => UseSuggestion($"Resuma as últimas sessões de consulta e o progresso geral do {GetSelectedPacienteName()}."))"
                          Style="background-color: #f1f5f9; color: #475569; font-weight: 600; cursor: pointer; font-size:0.8rem; border: 1px solid #e2e8f0; border-radius: 8px;"
                          Variant="Variant.Filled">📋 Resumo de sessões</MudChip>
-                <MudChip T="string" OnClick="@(() => UseSuggestion("Quais refeições do plano atual do Lucas contêm ingredientes que ele deve evitar?"))"
+                <MudChip T="string" OnClick="@(() => UseSuggestion($"Quais refeições do plano atual do {GetSelectedPacienteName()} contêm ingredientes que ele deve evitar?"))"
                          Style="background-color: #f1f5f9; color: #475569; font-weight: 600; cursor: pointer; font-size:0.8rem; border: 1px solid #e2e8f0; border-radius: 8px;"
                          Variant="Variant.Filled">🔍 Verificar refeições</MudChip>
             </div>
@@ -224,6 +224,9 @@
 @code {
     // ── Estado ──
     private int selectedPacienteId;
+
+    private string GetSelectedPacienteName() =>
+        pacientes.FirstOrDefault(p => p.Id == selectedPacienteId)?.Nome ?? "paciente";
     private string userMessage = "";
     private bool isIndexing;
     private bool isThinking;
@@ -429,6 +432,11 @@
         }
     };
 
+    private static readonly Regex CitacoesRegex = new(
+        @"\[([A-Za-z_]+):(\d+)\]",
+        RegexOptions.Compiled,
+        TimeSpan.FromSeconds(1));
+
     // ── Renderização de citações ──
     /// <summary>
     /// Transforma [Tabela:Id] em badges HTML para exibição visual no chat.
@@ -437,7 +445,7 @@
     {
         var escaped = System.Web.HttpUtility.HtmlEncode(text);
         escaped = escaped.Replace("\n", "<br/>");
-        escaped = Regex.Replace(escaped, @"\[([A-Za-z_]+):(\d+)\]",
+        escaped = CitacoesRegex.Replace(escaped,
             m => {
                 var table = m.Groups[1].Value;
                 var friendly = GetFriendlyTableName(table);
