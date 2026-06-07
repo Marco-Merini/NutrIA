@@ -33,6 +33,6 @@
     private void ConfirmLogout()
     {
         MudDialog.Close(DialogResult.Ok(true));
-        NavigationManager.NavigateTo("/api/auth/logout", forceLoad: true);
+        NavigationManager.NavigateTo("/api/v1/auth/logout", forceLoad: true);
     }
 }

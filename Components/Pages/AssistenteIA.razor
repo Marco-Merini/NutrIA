@@ -5,80 +5,133 @@
 @inject NutriFlow.Data.ApplicationDbContext DbContext
 @inject NutriFlow.Services.AIService AIService
 @inject NutriFlow.Services.AuthService AuthService
+@inject NutriFlow.Services.IndexacaoBackgroundService IndexacaoBackground
 @using Microsoft.EntityFrameworkCore
 @using NutriFlow.Models
+@using NutriFlow.Models.Rag
+@using System.Text.RegularExpressions
 
-<PageTitle>Assistente RAG - NutriAI</PageTitle>
+<PageTitle>Assistente IA — NutrIA</PageTitle>
 
-<div class="mb-8">
-    <div class="d-flex align-center gap-3 mb-2">
-        <MudIcon Icon="@Icons.Material.Filled.Psychology" Style="color: #a855f7; font-size: 2rem;" />
-        <MudText Typo="Typo.h5" Class="font-bold">Assistente IA</MudText>
+<style>
+    .typing-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .typing-indicator span {
+        width: 6px;
+        height: 6px;
+        background-color: #7c3aed;
+        border-radius: 50%;
+        animation: bounce 1.4s infinite ease-in-out both;
+    }
+    .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+    .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+    @@keyframes bounce {
+        0%, 80%, 100% { transform: scale(0); }
+        40% { transform: scale(1.0); }
+    }
+</style>
+
+<div class="mb-6">
+    <div class="d-flex align-center gap-3 mb-1">
+        <div class="pa-2 rounded-lg" style="background: linear-gradient(135deg, #a855f7, #7c3aed); display: flex; align-items: center; justify-content: center;">
+            <MudIcon Icon="@Icons.Material.Filled.Psychology" Style="color: white; font-size: 1.8rem;" />
+        </div>
+        <div>
+            <MudText Typo="Typo.h5" Class="font-bold" Style="color: #1e293b; font-family: 'Outfit', sans-serif;">Assistente IA Nutricional</MudText>
+            <MudText Typo="Typo.body2" Style="color: #64748b;">
+                Sua assistente inteligente para suporte personalizado sobre os seus pacientes!
+            </MudText>
+        </div>
     </div>
-    <MudText Typo="Typo.body2" Style="color: #6b7280;">Busca vetorial semântica sobre o histórico dos pacientes</MudText>
 </div>
 
-<!-- Selector + Indexar -->
-<div class="d-flex align-center gap-3 mb-6">
-    <MudSelect T="int" @bind-Value="selectedPacienteId" Placeholder="Selecione o paciente" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter" Class="bg-white rounded-lg" Style="flex: 1;">
-        @foreach (var p in pacientes)
-        {
-            <MudSelectItem Value="@p.Id">@p.Nome</MudSelectItem>
-        }
-    </MudSelect>
-    <MudButton OnClick="IndexarPaciente" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Storage"
-               Style="background: linear-gradient(135deg, #a855f7, #7c3aed); color: white; height: 56px; border-radius: 12px; text-transform: none; font-weight: 600;"
-               Disabled="@(isIndexing || selectedPacienteId == 0)">
-        @if (isIndexing)
-        {
-            <MudProgressCircular Size="Size.Small" Color="Color.Default" Indeterminate="true" Class="mr-2" />
-            <span>Indexando paciente...</span>
-        }
-        else
-        {
-            <span>Indexar Selecionado</span>
-        }
-    </MudButton>
-</div>
+@* ── Selector + Indexar ── *@
+<MudPaper Elevation="0" Class="pa-5 mb-6" Style="border: 1px solid #e2e8f0; border-radius: 16px; background: #ffffff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.03);">
+    <div class="d-flex align-center gap-3 mb-4">
+        <div class="pa-2 rounded-lg" style="background: #f3e8ff;">
+            <MudIcon Icon="@Icons.Material.Filled.PersonSearch" Style="color:#a855f7;" />
+        </div>
+        <div>
+            <MudText Typo="Typo.subtitle1" Class="font-bold" Style="color: #1e293b; font-family: 'Outfit', sans-serif;">Paciente Ativo</MudText>
+            <MudText Typo="Typo.caption" Style="color: #64748b;">Selecione o paciente para carregar os dados do mesmo</MudText>
+        </div>
+    </div>
+    <div class="d-flex align-center gap-3" style="flex-wrap: wrap;">
+        <div class="d-flex flex-column flex-grow-1" style="min-width: 250px;">
+            <MudSelect T="int" @bind-Value="selectedPacienteId"
+                       @bind-Value:after="() => OnPacienteSelected(selectedPacienteId)"
+                       Placeholder="Selecione o paciente"
+                       Variant="Variant.Outlined"
+                       AnchorOrigin="Origin.BottomCenter"
+                       Class="bg-white rounded-lg">
+                @foreach (var p in pacientes)
+                {
+                    <MudSelectItem Value="@p.Id">@p.Nome</MudSelectItem>
+                }
+            </MudSelect>
+            @if (indexSummary != null && selectedPacienteId != 0)
+            {
+                <div class="d-flex align-center gap-1 mt-2 ml-1">
+                    <span style="display: inline-block; width: 8px; height: 8px; background-color: #22c55e; border-radius: 50%;"></span>
+                    <MudText Typo="Typo.caption" Style="color: #15803d; font-weight: 600;">Histórico do paciente carregado e disponível</MudText>
+                </div>
+            }
+        </div>
 
-@if (indexedPacienteNome != null)
-{
-    <MudAlert Severity="Severity.Success" Variant="Variant.Text" Dense="true" Class="mb-4" Style="border-radius: 8px;">
-        <b>@indexedPacienteNome</b> indexado com sucesso — @AIService.IndexedChunks.Count blocos vetorizados via FAISS
-    </MudAlert>
-}
+        <MudButton OnClick="IndexarPaciente"
+                   Variant="Variant.Filled"
+                   StartIcon="@Icons.Material.Filled.Check"
+                   Style="background: linear-gradient(135deg, #a855f7, #7c3aed); color: white; height: 56px; border-radius: 12px; text-transform: none; font-weight: 600; padding: 0 24px; box-shadow: 0 4px 10px rgba(124, 58, 237, 0.2);"
+                   Disabled="@(isIndexing || selectedPacienteId == 0)">
+            @if (isIndexing)
+            {
+                <MudProgressCircular Size="Size.Small" Color="Color.Default" Indeterminate="true" Class="mr-2" />
+                <span>Carregando dados...</span>
+            }
+            else
+            {
+                <span>Selecionar Paciente</span>
+            }
+        </MudButton>
+    </div>
+</MudPaper>
 
-<!-- Chat Area -->
-<div class="d-flex flex-column" style="min-height: calc(100vh - 420px); justify-content: space-between;">
-    <!-- Messages -->
-    <div class="d-flex flex-column gap-4" style="overflow-y: auto; max-height: calc(100vh - 520px); padding-right: 4px;">
+@* ── Chat Area ── *@
+<div class="d-flex flex-column" style="min-height: 520px; justify-content: space-between;">
+
+    @* ── Mensagens ── *@
+    <div id="chat-messages" class="d-flex flex-column gap-4" style="overflow-y: auto; height: 420px; max-height: 450px; padding-right: 8px; margin-bottom: 16px;">
         @foreach (var msg in chatMessages)
         {
             @if (msg.IsBot)
             {
-                <!-- Bot message -->
-                <div class="d-flex gap-3">
-                    <MudAvatar Style="background-color: #f3e8ff; color: #a855f7; width: 32px; height: 32px;" Class="mt-1">
-                        <MudIcon Icon="@Icons.Material.Filled.Psychology" Size="Size.Small" />
+                <div class="d-flex gap-3 my-2">
+                    <MudAvatar Style="background-color: #f3e8ff; color: #a855f7; width: 38px; height: 38px; border: 1px solid #d8b4fe;" Class="mt-1 shadow-sm">
+                        <MudIcon Icon="@Icons.Material.Filled.Psychology" Size="Size.Medium" />
                     </MudAvatar>
-                    <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid #e5e7eb; border-radius: 12px; border-top-left-radius: 4px; max-width: 85%;">
-                        <MudText Typo="Typo.body2" Style="color: #374151; line-height: 1.6; white-space: pre-wrap;">
-                            @msg.Text
-                        </MudText>
-                    </MudPaper>
+                    <div style="max-width: 85%;">
+                        <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid #e2e8f0; border-radius: 16px; border-top-left-radius: 4px; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                            @* Resposta com citações renderizadas *@
+                            <MudText Typo="Typo.body2" Style="color: #334155; line-height: 1.8; font-size: 0.95rem; white-space: pre-wrap; font-family: 'Inter', sans-serif;">
+                                @((MarkupString)RenderCitacoes(msg.Text))
+                            </MudText>
+                        </MudPaper>
+                    </div>
                 </div>
             }
             else
             {
-                <!-- User message -->
-                <div class="d-flex gap-3 justify-end">
-                    <MudPaper Elevation="0" Class="pa-4" Style="background: linear-gradient(135deg, #a855f7, #7c3aed); border-radius: 12px; border-top-right-radius: 4px; max-width: 85%;">
-                        <MudText Typo="Typo.body2" Style="color: white; line-height: 1.6;">
-                            @msg.Text
-                        </MudText>
-                    </MudPaper>
-                    <MudAvatar Style="background-color: #e0f2fe; color: #0284c7; width: 32px; height: 32px;" Class="mt-1">
-                        <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" />
+                <div class="d-flex gap-3 justify-end my-2">
+                    <div style="max-width: 85%;">
+                        <MudPaper Elevation="0" Class="pa-4" Style="background: linear-gradient(135deg, #a855f7, #7c3aed); border-radius: 16px; border-top-right-radius: 4px; box-shadow: 0 4px 6px -1px rgba(124, 58, 237, 0.1);">
+                            <MudText Typo="Typo.body2" Style="color: white; line-height: 1.8; font-size: 0.95rem; font-family: 'Inter', sans-serif;">@msg.Text</MudText>
+                        </MudPaper>
+                    </div>
+                    <MudAvatar Style="background-color: #e0f2fe; color: #0284c7; width: 38px; height: 38px; border: 1px solid #bae6fd;" Class="mt-1 shadow-sm">
+                        <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Medium" />
                     </MudAvatar>
                 </div>
             }
@@ -86,49 +139,106 @@
 
         @if (isThinking)
         {
-            <div class="d-flex gap-3">
-                <MudAvatar Style="background-color: #f3e8ff; color: #a855f7; width: 32px; height: 32px;" Class="mt-1">
-                    <MudIcon Icon="@Icons.Material.Filled.Psychology" Size="Size.Small" />
+            <div class="d-flex gap-3 my-2 align-center">
+                <MudAvatar Style="background-color: #f3e8ff; color: #a855f7; width: 38px; height: 38px; border: 1px solid #d8b4fe;" Class="shadow-sm">
+                    <MudIcon Icon="@Icons.Material.Filled.Psychology" Size="Size.Medium" />
                 </MudAvatar>
-                <MudPaper Elevation="0" Class="pa-4 d-flex align-center gap-2" Style="border: 1px solid #e5e7eb; border-radius: 12px; border-top-left-radius: 4px;">
-                    <MudProgressCircular Size="Size.Small" Color="Color.Secondary" Indeterminate="true" />
-                    <MudText Typo="Typo.body2" Style="color: #9ca3af;">Analisando dados vetorizados...</MudText>
-                </MudPaper>
+                <div class="d-flex align-center gap-2 px-4 py-3" style="border: 1px solid #e2e8f0; border-radius: 16px; border-top-left-radius: 4px; background: #ffffff;">
+                    <div class="typing-indicator">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                    <MudText Typo="Typo.body2" Style="color: #64748b;" Class="ml-2">NutrIA está formulando a resposta...</MudText>
+                </div>
             </div>
         }
     </div>
 
-    <!-- Bottom Input Area -->
-    <div class="mt-auto pt-6">
-        <!-- Suggestion Chips -->
-        <div class="d-flex flex-wrap gap-2 mb-4">
-            <MudChip T="string" OnClick="@(() => UseSuggestion("Qual a evolução do peso do paciente?"))" Style="background-color: #f3f4f6; color: #6b7280; font-weight: 500; cursor: pointer;" Class="rounded-pill px-3 py-1 border-0" Variant="Variant.Filled">Qual a evolução do peso do paciente?</MudChip>
-            <MudChip T="string" OnClick="@(() => UseSuggestion("Como está a aderência ao plano alimentar?"))" Style="background-color: #f3f4f6; color: #6b7280; font-weight: 500; cursor: pointer;" Class="rounded-pill px-3 py-1 border-0" Variant="Variant.Filled">Como está a aderência ao plano alimentar?</MudChip>
-            <MudChip T="string" OnClick="@(() => UseSuggestion("Quais são as restrições alimentares do paciente?"))" Style="background-color: #f3f4f6; color: #6b7280; font-weight: 500; cursor: pointer;" Class="rounded-pill px-3 py-1 border-0" Variant="Variant.Filled">Quais são as restrições alimentares do paciente?</MudChip>
-            <MudChip T="string" OnClick="@(() => UseSuggestion("Resumo das últimas sessões"))" Style="background-color: #f3f4f6; color: #6b7280; font-weight: 500; cursor: pointer;" Class="rounded-pill px-3 py-1 border-0" Variant="Variant.Filled">Resumo das últimas sessões</MudChip>
+    @* ── Input Area ── *@
+    <div class="mt-auto pt-2">
+        @* Sugestões de perguntas *@
+        <div class="mb-3">
+            <MudText Typo="Typo.body2" Style="color: #64748b; font-weight: 600;" Class="mb-2">💡 Sugestões do que você pode perguntar:</MudText>
+            <div class="d-flex flex-wrap gap-2">
+                <MudChip T="string" OnClick="@(() => UseSuggestion("Qual a evolução do peso do Lucas nos últimos 3 meses?"))"
+                         Style="background-color: #f1f5f9; color: #475569; font-weight: 600; cursor: pointer; font-size:0.8rem; border: 1px solid #e2e8f0; border-radius: 8px;"
+                         Variant="Variant.Filled">📈 Evolução do peso</MudChip>
+                <MudChip T="string" OnClick="@(() => UseSuggestion("Gere um plano alimentar semanal de 7 dias respeitando as restrições e preferências do Lucas."))"
+                         Style="background-color: #f1f5f9; color: #475569; font-weight: 600; cursor: pointer; font-size:0.8rem; border: 1px solid #e2e8f0; border-radius: 8px;"
+                         Variant="Variant.Filled">🥗 Gerar plano 7 dias</MudChip>
+                <MudChip T="string" OnClick="@(() => UseSuggestion("Quais são as restrições alimentares e alergias do Lucas?"))"
+                         Style="background-color: #f1f5f9; color: #475569; font-weight: 600; cursor: pointer; font-size:0.8rem; border: 1px solid #e2e8f0; border-radius: 8px;"
+                         Variant="Variant.Filled">⚠️ Restrições e alergias</MudChip>
+                <MudChip T="string" OnClick="@(() => UseSuggestion("Resuma as últimas sessões de consulta e o progresso geral do Lucas."))"
+                         Style="background-color: #f1f5f9; color: #475569; font-weight: 600; cursor: pointer; font-size:0.8rem; border: 1px solid #e2e8f0; border-radius: 8px;"
+                         Variant="Variant.Filled">📋 Resumo de sessões</MudChip>
+                <MudChip T="string" OnClick="@(() => UseSuggestion("Quais refeições do plano atual do Lucas contêm ingredientes que ele deve evitar?"))"
+                         Style="background-color: #f1f5f9; color: #475569; font-weight: 600; cursor: pointer; font-size:0.8rem; border: 1px solid #e2e8f0; border-radius: 8px;"
+                         Variant="Variant.Filled">🔍 Verificar refeições</MudChip>
+            </div>
         </div>
 
-        <!-- Input Field & Send Button -->
-        <div class="d-flex align-stretch gap-3">
-            <MudTextField @bind-Value="userMessage" Immediate="true" Placeholder="Faça uma pergunta sobre o paciente... (Enter para enviar)" Variant="Variant.Outlined" Class="bg-white flex-grow-1" Style="border-radius: 8px;"
-                          OnKeyDown="HandleKeyDown" Disabled="@isThinking" />
+        @* Campo de texto + enviar estilo ChatGPT *@
+        <MudPaper Elevation="0" Class="pa-1 d-flex align-center" Style="border: 1px solid #cbd5e1; border-radius: 16px; background: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+            <MudTextField @bind-Value="userMessage"
+                          Immediate="true"
+                          Placeholder="Faça uma pergunta sobre o paciente..."
+                          Variant="Variant.Text"
+                          Underline="false"
+                          Class="mx-3 flex-grow-1"
+                          Style="border: none;"
+                          OnKeyDown="HandleKeyDown"
+                          Disabled="@isThinking" />
             <MudIconButton Icon="@Icons.Material.Filled.Send"
-                           Style="background-color: #8ae4b9; color: white; width: 56px; height: 56px; border-radius: 8px;"
-                           Class="mt-1" OnClick="SendMessage" Disabled="@(isThinking || string.IsNullOrWhiteSpace(userMessage))" />
-        </div>
+                           Style="background: linear-gradient(135deg,#a855f7,#7c3aed); color: white; width: 44px; height: 44px; border-radius: 12px; margin: 4px;"
+                           OnClick="SendMessage"
+                           Disabled="@(isThinking || string.IsNullOrWhiteSpace(userMessage))" />
+        </MudPaper>
     </div>
 </div>
 
+@* ── Modal "Ver Fonte" ── *@
+<MudDialog @bind-Visible="fonteDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-family: 'Outfit', sans-serif; font-weight: 700;">📎 Detalhes da Fonte</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (selectedSource != null)
+        {
+            <MudText Typo="Typo.body2" Class="mb-2" Style="color:#475569;">
+                Categoria: <b>@GetFriendlyTableName(selectedSource.Tabela)</b>
+            </MudText>
+            <MudDivider Class="mb-3" />
+            <MudText Typo="Typo.body2" Style="line-height: 1.6; color: #1e293b;">@selectedSource.Descricao</MudText>
+            <div class="mt-4">
+                @GetFonteNavigationLink(selectedSource)
+            </div>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => fonteDialogVisible = false)" Variant="Variant.Text">Fechar</MudButton>
+    </DialogActions>
+</MudDialog>
+
 @code {
+    // ── Estado ──
     private int selectedPacienteId;
     private string userMessage = "";
     private bool isIndexing;
     private bool isThinking;
-    private string? indexedPacienteNome;
+    private bool consentimentoLGPD = true;
+    private bool indexLoadedFromDb = false;
 
     private List<Paciente> pacientes = new();
     private List<ChatMsg> chatMessages = new();
+    private Dictionary<string, int>? indexSummary;
 
+    // Modal "Ver Fonte"
+    private bool fonteDialogVisible = false;
+    private SourceReference? selectedSource;
+
+    // ── Inicialização ──
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
@@ -144,21 +254,24 @@
                     .Include(p => p.Sessoes)
                     .Include(p => p.Progressos)
                     .Include(p => p.PlanosDieta)
+                        .ThenInclude(pd => pd.Refeicoes)
                     .OrderBy(p => p.Nome)
                     .ToListAsync();
             }
 
-            // Mensagem inicial do bot
             chatMessages.Add(new ChatMsg
             {
                 IsBot = true,
-                Text = "Olá! Sou o assistente IA nutricional com busca vetorial RAG.\n\nPara começar:\n1. Selecione um paciente na lista acima\n2. Clique em \"Indexar Selecionado\" para vetorizar todo o histórico focado do paciente via FAISS\n3. Depois, faça perguntas específicas baseadas nos dados atualizados do seu paciente!"
+                Text = "Olá! Sou a assistente inteligente NutrIA 👋\n\n" +
+                       "Posso ajudar com análises nutricionais, planos alimentares, evolução de pacientes e dúvidas sobre consultas.\n\n" +
+                       "Para começar, selecione um paciente e faça sua pergunta no chat."
             });
 
             StateHasChanged();
         }
     }
 
+    // ── Indexação ──
     private async Task IndexarPaciente()
     {
         if (selectedPacienteId == 0) return;
@@ -168,32 +281,33 @@
 
         try
         {
-            var paciente = pacientes.FirstOrDefault(p => p.Id == selectedPacienteId);
-            if (paciente == null)
-            {
-                Snackbar.Add("Paciente não encontrado.", Severity.Error);
-                return;
-            }
+            // Carrega o paciente atualizado do banco com todos os dados e relacionamentos para o RAG
+            var paciente = await DbContext.Pacientes
+                .AsNoTracking()
+                .Include(p => p.Sessoes)
+                .Include(p => p.Progressos)
+                .Include(p => p.PlanosDieta)
+                    .ThenInclude(pd => pd.Refeicoes)
+                .FirstOrDefaultAsync(p => p.Id == selectedPacienteId);
+
+            if (paciente == null) { Snackbar.Add("Paciente não encontrado.", Severity.Error); return; }
 
             await AIService.IndexPacienteAsync(paciente);
-            indexedPacienteNome = paciente.Nome;
+            indexSummary = AIService.GetIndexSummary(selectedPacienteId);
+            indexLoadedFromDb = false;
 
             chatMessages.Add(new ChatMsg
             {
                 IsBot = true,
-                Text = $"✅ Histórico de \"{paciente.Nome}\" indexado com sucesso!\n\n📊 {AIService.IndexedChunks.Count} blocos de informação focados neste paciente foram vetorizados no banco FAISS.\n\nAgora você pode me fazer perguntas profundas com total certeza de retorno!"
+                Text = "✅ Histórico do paciente carregado com sucesso."
             });
 
-            Snackbar.Add($"Paciente {paciente.Nome} indexado com sucesso!", Severity.Success);
+            Snackbar.Add("Histórico do paciente carregado com sucesso.", Severity.Success);
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Erro ao indexar: {ex.Message}", Severity.Error);
-            chatMessages.Add(new ChatMsg
-            {
-                IsBot = true,
-                Text = $"❌ Erro ao indexar o paciente selecionado: {ex.Message}"
-            });
+            Snackbar.Add($"Erro ao carregar dados: {ex.Message}", Severity.Error);
+            chatMessages.Add(new ChatMsg { IsBot = true, Text = $"❌ Erro ao carregar dados: {ex.Message}" });
         }
         finally
         {
@@ -202,12 +316,34 @@
         }
     }
 
+    // ── Seleção de paciente: tenta carregar índice do banco ──
+    private async Task OnPacienteSelected(int pacienteId)
+    {
+        selectedPacienteId = pacienteId;
+        if (pacienteId == 0) return;
+
+        if (!AIService.IsIndexed(pacienteId))
+        {
+            var loaded = await AIService.LoadIndexFromDbAsync(pacienteId);
+            if (loaded)
+            {
+                indexSummary = AIService.GetIndexSummary(pacienteId);
+                indexLoadedFromDb = true;
+                Snackbar.Add("Histórico do paciente carregado com sucesso.", Severity.Success);
+                StateHasChanged();
+            }
+        }
+        else
+        {
+            indexSummary = AIService.GetIndexSummary(pacienteId);
+            indexLoadedFromDb = false;
+        }
+    }
+
+    // ── Envio de mensagem ──
     private async Task HandleKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
     {
-        if (e.Key == "Enter" && !e.ShiftKey)
-        {
-            await SendMessage();
-        }
+        if (e.Key == "Enter" && !e.ShiftKey) await SendMessage();
     }
 
     private async Task UseSuggestion(string suggestion)
@@ -221,7 +357,6 @@
         var msg = userMessage?.Trim();
         if (string.IsNullOrWhiteSpace(msg)) return;
 
-        // Add user message
         chatMessages.Add(new ChatMsg { IsBot = false, Text = msg });
         userMessage = "";
         isThinking = true;
@@ -229,8 +364,27 @@
 
         try
         {
-            var response = await AIService.AskQuestionAsync(msg);
-            chatMessages.Add(new ChatMsg { IsBot = true, Text = response });
+            var paciente = pacientes.FirstOrDefault(p => p.Id == selectedPacienteId);
+            AssistenteResponse response;
+
+            if (paciente != null)
+            {
+                // Pipeline RAG completo com citações
+                response = await AIService.AskQuestionRagAsync(msg, paciente);
+            }
+            else
+            {
+                // Fallback sem paciente selecionado
+                var answerText = await AIService.AskQuestionAsync(msg);
+                response = new AssistenteResponse { Answer = answerText, UsouDadosIndexados = false };
+            }
+
+            chatMessages.Add(new ChatMsg
+            {
+                IsBot = true,
+                Text = response.Answer,
+                Response = response
+            });
         }
         catch (Exception ex)
         {
@@ -247,9 +401,116 @@
         }
     }
 
+    // ── Fontes ──
+    private void AbrirFonte(SourceReference source)
+    {
+        selectedSource = source;
+        fonteDialogVisible = true;
+    }
+
+    private void ToggleEntidades(ChatMsg msg)
+    {
+        msg.ShowEntidades = !msg.ShowEntidades;
+        StateHasChanged();
+    }
+
+    private RenderFragment GetFonteNavigationLink(SourceReference src) => builder =>
+    {
+        var url = src.Tabela switch
+        {
+            "Planos_Dieta" => $"/planos-alimentares",
+            "Progresso" => $"/progresso",
+            "Sessoes" => $"/sessoes",
+            "Refeicoes" => $"/planos-alimentares",
+            _ => null
+        };
+        if (url != null)
+        {
+            builder.OpenElement(0, "a");
+            builder.AddAttribute(1, "href", url);
+            builder.AddAttribute(2, "style", "color: #a855f7; font-size: 0.85rem; font-weight: 600;");
+            builder.AddContent(3, $"→ Ver {GetFriendlyTableName(src.Tabela).ToLower()}");
+            builder.CloseElement();
+        }
+    };
+
+    // ── Renderização de citações ──
+    /// <summary>
+    /// Transforma [Tabela:Id] em badges HTML para exibição visual no chat.
+    /// </summary>
+    private static string RenderCitacoes(string text)
+    {
+        var escaped = System.Web.HttpUtility.HtmlEncode(text);
+        escaped = escaped.Replace("\n", "<br/>");
+        escaped = Regex.Replace(escaped, @"\[([A-Za-z_]+):(\d+)\]",
+            m => {
+                var table = m.Groups[1].Value;
+                var friendly = GetFriendlyTableName(table);
+                return $"<span style='background:#f5f3ff; color:#7c3aed; border-radius:6px; padding:2px 8px; font-size:0.8em; font-weight:600; display:inline-block; margin:0 2px; border:1px solid #ddd6fe;'>📎 {friendly}</span>";
+            });
+
+        return escaped;
+    }
+
+    // ── Helpers visuais ──
+    private static string GetFriendlyTableName(string tabela) => tabela switch
+    {
+        "Pacientes" => "Perfil do Paciente",
+        "Planos_Dieta" => "Plano Alimentar",
+        "Sessoes" => "Consulta",
+        "Refeicoes" => "Refeição",
+        "Progresso" => "Evolução",
+        _ => tabela
+    };
+
+    private static string GetTipoColor(string tipo) => tipo switch
+    {
+        "perfil" => "#7c3aed",
+        "preferencias" => "#0284c7",
+        "saude" => "#dc2626",
+        "medicamentos" => "#d97706",
+        "observacoes" => "#6b7280",
+        "sessao" => "#059669",
+        "progresso" => "#0891b2",
+        "plano" => "#7c3aed",
+        "refeicao" => "#16a34a",
+        _ => "#6b7280"
+    };
+
+    private static string GetTipoIcon(string tipo) => tipo switch
+    {
+        "perfil" => "👤",
+        "preferencias" => "🍽️",
+        "saude" => "🏥",
+        "medicamentos" => "💊",
+        "observacoes" => "📝",
+        "sessao" => "📅",
+        "progresso" => "📈",
+        "plano" => "📋",
+        "refeicao" => "🥗",
+        _ => "📄"
+    };
+
+    private static string GetFriendlyTypeName(string tipo) => tipo switch
+    {
+        "perfil" => "Perfil",
+        "preferencias" => "Preferências",
+        "saude" => "Restrições",
+        "medicamentos" => "Medicamentos",
+        "observacoes" => "Observações",
+        "sessao" => "Consultas",
+        "progresso" => "Evolução",
+        "plano" => "Plano Dieta",
+        "refeicao" => "Refeições",
+        _ => tipo
+    };
+
+    // ── Modelo de mensagem ──
     public class ChatMsg
     {
         public bool IsBot { get; set; }
         public string Text { get; set; } = "";
+        public AssistenteResponse? Response { get; set; }
+        public bool ShowEntidades { get; set; }
     }
 }

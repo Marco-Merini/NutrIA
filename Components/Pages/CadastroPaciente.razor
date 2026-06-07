@@ -4,7 +4,7 @@
 @using NutriFlow.Data
 @using NutriFlow.Models
 @using Microsoft.EntityFrameworkCore
-@inject ApplicationDbContext DbContext
+@inject NutriFlow.Services.IPacienteService PacienteService
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
 @inject NutriFlow.Services.AuthService AuthService
@@ -128,14 +128,17 @@
                 if (AuthService.CurrentUser != null)
                 {
                     PacienteModel.UsuarioId = AuthService.CurrentUser.Id;
-                    PacienteModel.DataCadastro = DateTime.Now;
-                    PacienteModel.Status = "ativo";
+                    var added = await PacienteService.AddPacienteAsync(PacienteModel);
 
-                    DbContext.Pacientes.Add(PacienteModel);
-                    await DbContext.SaveChangesAsync();
-
-                    Snackbar.Add("Paciente cadastrado com sucesso!", Severity.Success);
-                    NavigationManager.NavigateTo("/pacientes");
+                    if (added)
+                    {
+                        Snackbar.Add("Paciente cadastrado com sucesso!", Severity.Success);
+                        NavigationManager.NavigateTo("/pacientes");
+                    }
+                    else
+                    {
+                        Snackbar.Add("Erro ao cadastrar paciente.", Severity.Error);
+                    }
                 }
             }
             catch (Exception ex)

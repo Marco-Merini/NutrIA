@@ -4,7 +4,7 @@
 @using NutriFlow.Data
 @using NutriFlow.Models
 @using Microsoft.EntityFrameworkCore
-@inject ApplicationDbContext DbContext
+@inject NutriFlow.Services.IPacienteService PacienteService
 @inject IDialogService DialogService
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
@@ -83,19 +83,10 @@
 
     private async Task LoadPacientes()
     {
-        try 
+        if (AuthService.CurrentUser != null)
         {
-            if (AuthService.CurrentUser != null)
-            {
-                var userId = AuthService.CurrentUser.Id;
-                pacientes = await DbContext.Pacientes
-                    .Where(p => p.UsuarioId == userId)
-                    .ToListAsync();
-            }
-        }
-        catch 
-        {
-            Snackbar.Add("Erro ao carregar pacientes do banco de dados.", Severity.Error);
+            var userId = AuthService.CurrentUser.Id;
+            pacientes = await PacienteService.GetPacientesByUsuarioIdAsync(userId);
         }
     }
 
@@ -108,18 +99,19 @@
             
         if (result == true)
         {
-            try
+            if (AuthService.CurrentUser != null)
             {
-                DbContext.Pacientes.Remove(paciente);
-                await DbContext.SaveChangesAsync();
-                
-                pacientes.Remove(paciente);
-                Snackbar.Add("Paciente deletado com sucesso.", Severity.Success);
-                StateHasChanged();
-            }
-            catch (Exception ex)
-            {
-                Snackbar.Add($"Erro ao deletar paciente: {ex.Message}", Severity.Error);
+                var success = await PacienteService.DeletePacienteAsync(paciente.Id, AuthService.CurrentUser.Id);
+                if (success)
+                {
+                    pacientes.Remove(paciente);
+                    Snackbar.Add("Paciente deletado com sucesso.", Severity.Success);
+                    StateHasChanged();
+                }
+                else
+                {
+                    Snackbar.Add("Erro ao deletar paciente.", Severity.Error);
+                }
             }
         }
     }

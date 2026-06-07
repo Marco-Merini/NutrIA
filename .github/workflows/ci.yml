@@ -1,0 +1,29 @@
+name: NutrIA CI Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Código-Fonte
+      uses: actions/checkout@v4
+
+    - name: Configurar ambiente .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restaurar Dependências NuGet
+      run: dotnet restore
+
+    - name: Compilar Solução (Release)
+      run: dotnet build --no-restore -c Release
+
+    - name: Executar Testes Unitários
+      run: dotnet test --no-build -c Release --verbosity normal
