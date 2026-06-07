@@ -27,14 +27,14 @@ RUN dotnet publish "NutriFlow.csproj" -c Release -o /app/publish /p:UseAppHost=f
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 WORKDIR /app
 
-# Copiar arquivos com propriedade do usuário não-root 'app'
-COPY --chown=app:app --from=publish /app/publish .
+# Copiar arquivos sem dar propriedade de escrita ao usuário não-root (deixando-os como somente leitura)
+COPY --from=publish /app/publish .
 
 # Definir variáveis de ambiente padrão e expor porta não privilegiada (8080)
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 
-# Mudar para o usuário não-root 'app'
+# Mudar para o usuário não-root 'app' para execução (que terá apenas permissão de leitura sobre os binários)
 USER app
 
 ENTRYPOINT ["dotnet", "NutriFlow.dll"]
