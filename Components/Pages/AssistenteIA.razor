@@ -227,8 +227,6 @@
     private string userMessage = "";
     private bool isIndexing;
     private bool isThinking;
-    private bool consentimentoLGPD = true;
-    private bool indexLoadedFromDb = false;
 
     private List<Paciente> pacientes = new();
     private List<ChatMsg> chatMessages = new();
@@ -294,7 +292,6 @@
 
             await AIService.IndexPacienteAsync(paciente);
             indexSummary = AIService.GetIndexSummary(selectedPacienteId);
-            indexLoadedFromDb = false;
 
             chatMessages.Add(new ChatMsg
             {
@@ -328,7 +325,6 @@
             if (loaded)
             {
                 indexSummary = AIService.GetIndexSummary(pacienteId);
-                indexLoadedFromDb = true;
                 Snackbar.Add("Histórico do paciente carregado com sucesso.", Severity.Success);
                 StateHasChanged();
             }
@@ -336,7 +332,6 @@
         else
         {
             indexSummary = AIService.GetIndexSummary(pacienteId);
-            indexLoadedFromDb = false;
         }
     }
 

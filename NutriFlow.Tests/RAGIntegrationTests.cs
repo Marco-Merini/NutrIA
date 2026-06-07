@@ -165,6 +165,7 @@ namespace NutriFlow.Tests
             scopeFactoryMock.Setup(sf => sf.CreateScope()).Returns(serviceScopeMock.Object);
 
             var aiService = new AIService(apiKey, scopeFactoryMock.Object, config);
+            Assert.NotNull(aiService);
 
             // 6. Indexar paciente
             _output.WriteLine("Indexando o paciente Lucas Merini...");
@@ -203,6 +204,8 @@ namespace NutriFlow.Tests
                 }
 
                 var response = await aiService.AskQuestionRagAsync(query, paciente);
+                Assert.NotNull(response);
+                Assert.False(string.IsNullOrEmpty(response.Answer));
                 
                 _output.WriteLine($"Resposta da IA:\n{response.Answer}");
                 _output.WriteLine("Fontes Citadas:");
