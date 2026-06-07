@@ -49,6 +49,18 @@ namespace NutriFlow.Services
         private readonly IConfiguration _configuration;
 
         private const int EmbeddingDimension = 1536; // text-embedding-3-small
+        private const string PacientesTableName = "Pacientes";
+        private const string SystemPrompt = """
+            Você é um assistente profissional em nutrição chamado NutrIA.
+
+            REGRAS OBRIGATÓRIAS:
+            1. Responda SOMENTE com base nos documentos recuperados fornecidos abaixo.
+            2. Cite a fonte de CADA afirmação usando o formato [Tabela:Id] — exemplo: [Planos_Dieta:45], [Progresso:200], [Refeicoes:78].
+            3. Se a informação não estiver nos documentos recuperados, responda claramente: "Não tenho informação suficiente nos registros indexados para responder isto."
+            4. NUNCA invente dados clínicos, valores nutricionais ou histórico que não esteja nas fontes.
+            5. Ao gerar planos alimentares, respeite SEMPRE: alergias, condições de saúde, medicamentos e preferências do paciente.
+            6. Responda em português brasileiro, de forma clara, profissional e estruturada.
+            """;
 
         /// <summary>
         /// Índice em memória por pacienteId. Permite múltiplos pacientes indexados simultaneamente
@@ -156,7 +168,7 @@ namespace NutriFlow.Services
                 catch (Exception ex)
                 {
                     Console.WriteLine($"[AIService] Falha na indexação do lote {i}: {ex.Message}");
-                    throw new Exception($"Falha de comunicação com a OpenAI (Lote {i}): {ex.Message}", ex);
+                    throw new InvalidOperationException($"Falha de comunicação com a OpenAI (Lote {i}): {ex.Message}", ex);
                 }
             }
 
@@ -261,54 +273,18 @@ namespace NutriFlow.Services
             var topChunks = SearchSimilarChunks(queryVector, chunks, options.TopK, options.ScoreThreshold);
 
             // Forçar a inclusão de chunks essenciais do paciente para contornar falhas de busca semântica (multi-hop / gaps)
-            var forceChunks = new List<DocumentChunk>();
-
-            // a. Chunks de perfil e dados clínicos principais
-            var coreTypes = new[] { "perfil", "preferencias", "saude", "medicamentos", "observacoes" };
-            var coreChunks = chunks.Where(c => coreTypes.Contains(c.Tipo)).ToList();
-            forceChunks.AddRange(coreChunks);
-
-            // b. Plano de dieta ativo ou mais recente
-            var activePlano = chunks.FirstOrDefault(c => c.Tipo == "plano" && 
-                (c.Text.Contains("Status: ativo", StringComparison.OrdinalIgnoreCase) || 
-                 c.Text.Contains("Status: Ativo", StringComparison.OrdinalIgnoreCase)));
-            
-            if (activePlano == null)
-            {
-                activePlano = chunks
-                    .Where(c => c.Tipo == "plano")
-                    .OrderByDescending(c => c.DataAtualizacao)
-                    .FirstOrDefault();
-            }
-
-            if (activePlano != null)
-            {
-                forceChunks.Add(activePlano);
-                
-                // c. Refeições associadas a este plano
-                if (activePlano.RegistroId.HasValue)
-                {
-                    int planoId = activePlano.RegistroId.Value;
-                    var activeRefeicoes = chunks
-                        .Where(c => c.Tipo == "refeicao" && c.Text.Contains($"Plano ID={planoId}"))
-                        .ToList();
-                    forceChunks.AddRange(activeRefeicoes);
-                }
-            }
+            var forceChunks = GetForceChunks(chunks);
 
             // Mesclar evitando duplicidade
             var finalChunks = new List<DocumentChunk>(topChunks);
-            foreach (var fc in forceChunks)
+            foreach (var fc in forceChunks.Where(fc => !finalChunks.Any(c => c.Tabela == fc.Tabela && c.RegistroId == fc.RegistroId)))
             {
-                if (!finalChunks.Any(c => c.Tabela == fc.Tabela && c.RegistroId == fc.RegistroId))
+                // Calcula score de similaridade real para exibição se tiver o embedding
+                if (fc.Embedding != null && fc.Embedding.Length > 0)
                 {
-                    // Calcula score de similaridade real para exibição se tiver o embedding
-                    if (fc.Embedding != null && fc.Embedding.Length > 0)
-                    {
-                        fc.Score = TensorPrimitives.CosineSimilarity(queryVector, fc.Embedding);
-                    }
-                    finalChunks.Add(fc);
+                    fc.Score = TensorPrimitives.CosineSimilarity(queryVector, fc.Embedding);
                 }
+                finalChunks.Add(fc);
             }
 
             topChunks = finalChunks;
@@ -328,25 +304,13 @@ namespace NutriFlow.Services
             var patientProfile = BuildPseudonymizedProfile(paciente, options);
             var contextBlock = BuildContextBlock(topChunks);
 
-            var systemPrompt = BuildSystemPrompt();
             var userContent = BuildUserContent(patientProfile, contextBlock, question, paciente.Nome, options);
 
             // 4. Chamar o LLM
             string answer;
             try
             {
-                var messages = new List<ChatMessage>
-                {
-                    ChatMessage.CreateSystemMessage(systemPrompt),
-                    ChatMessage.CreateUserMessage(userContent)
-                };
-
-                var ragSection = _configuration.GetSection("RAG");
-                int maxTokens = int.TryParse(ragSection["MaxTokensResposta"], out var mt) ? mt : 2000;
-
-                var completionOptions = new ChatCompletionOptions { MaxOutputTokenCount = maxTokens };
-                var completion = await _chatClient.CompleteChatAsync(messages, completionOptions);
-                answer = completion.Value.Content[0].Text ?? "Não foi possível gerar uma resposta.";
+                answer = await GenerateLlmAnswerAsync(userContent);
             }
             catch (Exception ex)
             {
@@ -391,6 +355,62 @@ namespace NutriFlow.Services
             };
         }
 
+        private static List<DocumentChunk> GetForceChunks(List<DocumentChunk> chunks)
+        {
+            var forceChunks = new List<DocumentChunk>();
+
+            // a. Chunks de perfil e dados clínicos principais
+            var coreTypes = new[] { "perfil", "preferencias", "saude", "medicamentos", "observacoes" };
+            var coreChunks = chunks.Where(c => coreTypes.Contains(c.Tipo)).ToList();
+            forceChunks.AddRange(coreChunks);
+
+            // b. Plano de dieta ativo ou mais recente
+            var activePlano = chunks.FirstOrDefault(c => c.Tipo == "plano" && 
+                (c.Text.Contains("Status: ativo", StringComparison.OrdinalIgnoreCase) || 
+                 c.Text.Contains("Status: Ativo", StringComparison.OrdinalIgnoreCase)));
+            
+            if (activePlano == null)
+            {
+                activePlano = chunks
+                    .Where(c => c.Tipo == "plano")
+                    .OrderByDescending(c => c.DataAtualizacao)
+                    .FirstOrDefault();
+            }
+
+            if (activePlano != null)
+            {
+                forceChunks.Add(activePlano);
+                
+                // c. Refeições associadas a este plano
+                if (activePlano.RegistroId.HasValue)
+                {
+                    int planoId = activePlano.RegistroId.Value;
+                    var activeRefeicoes = chunks
+                        .Where(c => c.Tipo == "refeicao" && c.Text.Contains($"Plano ID={planoId}"))
+                        .ToList();
+                    forceChunks.AddRange(activeRefeicoes);
+                }
+            }
+
+            return forceChunks;
+        }
+
+        private async Task<string> GenerateLlmAnswerAsync(string userContent)
+        {
+            var messages = new List<ChatMessage>
+            {
+                ChatMessage.CreateSystemMessage(SystemPrompt),
+                ChatMessage.CreateUserMessage(userContent)
+            };
+
+            var ragSection = _configuration.GetSection("RAG");
+            int maxTokens = int.TryParse(ragSection["MaxTokensResposta"], out var mt) ? mt : 2000;
+
+            var completionOptions = new ChatCompletionOptions { MaxOutputTokenCount = maxTokens };
+            var completion = await _chatClient.CompleteChatAsync(messages, completionOptions);
+            return completion.Value.Content[0].Text ?? "Não foi possível gerar uma resposta.";
+        }
+
         /// <summary>
         /// Retrocompatibilidade: responde pergunta simples sem retornar metadados de fontes.
         /// Usado pela versão anterior da UI (AssistenteIA.razor antes da refatoração).
@@ -409,10 +429,9 @@ namespace NutriFlow.Services
             foreach (var chunk in topChunks)
                 contextBuilder.AppendLine($"--- [{chunk.Tabela}:{chunk.RegistroId}]:\n{chunk.Text}\n");
 
-            var systemPrompt = BuildSystemPrompt();
             var messages = new List<ChatMessage>
             {
-                ChatMessage.CreateSystemMessage(systemPrompt),
+                ChatMessage.CreateSystemMessage(SystemPrompt),
                 ChatMessage.CreateUserMessage($"Contexto:\n{contextBuilder}\n\nPergunta: {question}")
             };
 
@@ -490,7 +509,7 @@ Retorne EXCLUSIVAMENTE um objeto JSON com a seguinte estrutura (sem formatação
             // ── Perfil básico (pseudonimizado — sem nome, e-mail, telefone) ──
             chunks.Add(new DocumentChunk
             {
-                Tabela = "Pacientes",
+                Tabela = PacientesTableName,
                 RegistroId = p.Id,
                 PacienteId = p.Id,
                 Tipo = "perfil",
@@ -505,7 +524,7 @@ Retorne EXCLUSIVAMENTE um objeto JSON com a seguinte estrutura (sem formatação
             if (!string.IsNullOrWhiteSpace(p.PreferenciasAlimentares))
                 chunks.Add(new DocumentChunk
                 {
-                    Tabela = "Pacientes", RegistroId = p.Id, PacienteId = p.Id,
+                    Tabela = PacientesTableName, RegistroId = p.Id, PacienteId = p.Id,
                     Tipo = "preferencias", DataAtualizacao = p.DataAtualizacao,
                     Source = $"Pacientes:{p.Id}",
                     Text = $"Preferências alimentares do paciente ID={p.Id}: {p.PreferenciasAlimentares}."
@@ -514,7 +533,7 @@ Retorne EXCLUSIVAMENTE um objeto JSON com a seguinte estrutura (sem formatação
             if (!string.IsNullOrWhiteSpace(p.CondicoesSaude))
                 chunks.Add(new DocumentChunk
                 {
-                    Tabela = "Pacientes", RegistroId = p.Id, PacienteId = p.Id,
+                    Tabela = PacientesTableName, RegistroId = p.Id, PacienteId = p.Id,
                     Tipo = "saude", DataAtualizacao = p.DataAtualizacao,
                     Source = $"Pacientes:{p.Id}",
                     Text = $"Condições de saúde do paciente ID={p.Id}: {p.CondicoesSaude}."
@@ -523,7 +542,7 @@ Retorne EXCLUSIVAMENTE um objeto JSON com a seguinte estrutura (sem formatação
             if (!string.IsNullOrWhiteSpace(p.Medicamentos))
                 chunks.Add(new DocumentChunk
                 {
-                    Tabela = "Pacientes", RegistroId = p.Id, PacienteId = p.Id,
+                    Tabela = PacientesTableName, RegistroId = p.Id, PacienteId = p.Id,
                     Tipo = "medicamentos", DataAtualizacao = p.DataAtualizacao,
                     Source = $"Pacientes:{p.Id}",
                     Text = $"Medicamentos em uso pelo paciente ID={p.Id}: {p.Medicamentos}."
@@ -532,7 +551,7 @@ Retorne EXCLUSIVAMENTE um objeto JSON com a seguinte estrutura (sem formatação
             if (!string.IsNullOrWhiteSpace(p.Observacoes))
                 chunks.Add(new DocumentChunk
                 {
-                    Tabela = "Pacientes", RegistroId = p.Id, PacienteId = p.Id,
+                    Tabela = PacientesTableName, RegistroId = p.Id, PacienteId = p.Id,
                     Tipo = "observacoes", DataAtualizacao = p.DataAtualizacao,
                     Source = $"Pacientes:{p.Id}",
                     Text = $"Observações clínicas do paciente ID={p.Id}: {p.Observacoes}."
@@ -616,7 +635,7 @@ Retorne EXCLUSIVAMENTE um objeto JSON com a seguinte estrutura (sem formatação
         /// Busca vetorial: tenta FAISS (IndexFlatL2), com fallback para Cosine Similarity.
         /// Aplica score threshold para filtrar resultados irrelevantes.
         /// </summary>
-        private List<DocumentChunk> SearchSimilarChunks(
+        private static List<DocumentChunk> SearchSimilarChunks(
             float[] queryVector,
             List<DocumentChunk> chunks,
             int topK,
@@ -671,18 +690,6 @@ Retorne EXCLUSIVAMENTE um objeto JSON com a seguinte estrutura (sem formatação
         // ─────────────────────────────────────────────────────────────────────
         // PROMPT ENGINEERING
         // ─────────────────────────────────────────────────────────────────────
-
-        private static string BuildSystemPrompt() => """
-            Você é um assistente profissional em nutrição chamado NutrIA.
-
-            REGRAS OBRIGATÓRIAS:
-            1. Responda SOMENTE com base nos documentos recuperados fornecidos abaixo.
-            2. Cite a fonte de CADA afirmação usando o formato [Tabela:Id] — exemplo: [Planos_Dieta:45], [Progresso:200], [Refeicoes:78].
-            3. Se a informação não estiver nos documentos recuperados, responda claramente: "Não tenho informação suficiente nos registros indexados para responder isto."
-            4. NUNCA invente dados clínicos, valores nutricionais ou histórico que não esteja nas fontes.
-            5. Ao gerar planos alimentares, respeite SEMPRE: alergias, condições de saúde, medicamentos e preferências do paciente.
-            6. Responda em português brasileiro, de forma clara, profissional e estruturada.
-            """;
 
         private static string BuildUserContent(
             string patientProfile,

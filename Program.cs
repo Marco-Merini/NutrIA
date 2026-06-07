@@ -193,8 +193,119 @@ app.MapPost("/api/v1/auth/login", async (
     HttpContext httpContext,
     [Microsoft.AspNetCore.Mvc.FromForm] string email,
     [Microsoft.AspNetCore.Mvc.FromForm] string senha,
-    ApplicationDbContext dbContext,
-    AuthService authService) =>
+    AuthService authService) => await HandleLoginAsync(httpContext, email, senha, authService, expireHours)).DisableAntiforgery();
+
+app.MapGet("/api/v1/auth/logout", (HttpContext httpContext) =>
+{
+    httpContext.Response.Cookies.Delete("NutriAI.AuthToken");
+    return Results.Redirect("/");
+});
+
+// ─── Endpoint RAG: POST /api/v1/assistente/query ─────────────────────────────
+app.MapPost("/api/v1/assistente/query", async (
+    HttpContext httpContext,
+    AssistenteQuery request,
+    AIService aiService,
+    AuditoriaService auditoriaService,
+    ApplicationDbContext db) => await HandleQueryAsync(httpContext, request, aiService, auditoriaService, db))
+.RequireAuthorization().DisableAntiforgery().RequireRateLimiting("ia-policy");
+
+// ─── Endpoint RAG: GET /api/v1/assistente/audit/{pacienteId} ─────────────────
+app.MapGet("/api/v1/assistente/audit/{pacienteId:int}", async (
+    int pacienteId,
+    HttpContext httpContext,
+    AuditoriaService auditoriaService,
+    ApplicationDbContext db) =>
+{
+    if (!httpContext.User.Identity?.IsAuthenticated ?? true)
+        return Results.Unauthorized();
+
+    var userIdClaim = httpContext.User.FindFirst("UsuarioId")?.Value;
+    if (!int.TryParse(userIdClaim, out int userId))
+        return Results.Unauthorized();
+
+    var pacienteExiste = await db.Pacientes
+        .AnyAsync(p => p.Id == pacienteId && p.UsuarioId == userId);
+
+    if (!pacienteExiste)
+        return Results.Forbid();
+
+    var logs = await auditoriaService.GetLogsPorPacienteAsync(pacienteId, userId.ToString());
+    return Results.Ok(logs);
+
+}).RequireAuthorization();
+
+// ─── Endpoint RAG: GET /api/v1/assistente/metricas ───────────────────────────
+app.MapGet("/api/v1/assistente/metricas", async (
+    HttpContext httpContext,
+    AuditoriaService auditoriaService) =>
+{
+    if (!httpContext.User.Identity?.IsAuthenticated ?? true)
+        return Results.Unauthorized();
+
+    var userIdClaim = httpContext.User.FindFirst("UsuarioId")?.Value;
+    if (string.IsNullOrEmpty(userIdClaim)) return Results.Unauthorized();
+
+    var metricas = await auditoriaService.GetMetricasAsync(userIdClaim);
+    return Results.Ok(metricas);
+
+}).RequireAuthorization();
+
+// ─── Blazor ───────────────────────────────────────────────────────────────
+// ─── Migrações Automáticas ────────────────────────────────────────────────
+await ApplyMigrationsAsync(app);
+
+app.MapRazorComponents<App>()
+    .AddInteractiveServerRenderMode();
+
+app.Run();
+
+// ─── Funções Auxiliares Locais ─────────────────────────────────────────────
+
+static async Task ApplyMigrationsAsync(WebApplication app)
+{
+    using var scope = app.Services.CreateScope();
+    var services = scope.ServiceProvider;
+    var logger = services.GetRequiredService<ILogger<Program>>();
+    var db = services.GetRequiredService<ApplicationDbContext>();
+    
+    for (int i = 1; i <= 12; i++)
+    {
+        try
+        {
+            logger.LogInformation("Aplicando migrações do banco de dados (Tentativa {Tentativa}/12)...", i);
+            await db.Database.MigrateAsync();
+            logger.LogInformation("Banco de dados pronto e migrações aplicadas com sucesso!");
+            break;
+        }
+        catch (Exception ex)
+        {
+            // Se as tabelas já existem, podemos prosseguir normalmente
+            if (ex.Message.Contains("Já existe um objeto com nome") || 
+                ex.Message.Contains("already exists") || 
+                ex.Message.Contains("there is already an object"))
+            {
+                logger.LogWarning("O banco de dados já possui a estrutura de tabelas criada. Ignorando migração inicial.");
+                break;
+            }
+
+            logger.LogWarning("SQL Server não está pronto: {Message}. Aguardando 5 segundos...", ex.Message);
+            if (i == 12)
+            {
+                logger.LogError(ex, "Falha de conexão com o banco após 12 tentativas.");
+                throw;
+            }
+            await Task.Delay(5000);
+        }
+    }
+}
+
+static async Task<IResult> HandleLoginAsync(
+    HttpContext httpContext,
+    string email,
+    string senha,
+    AuthService authService,
+    int expireHours)
 {
     var (success, token) = await authService.LoginAsync(email, senha);
 
@@ -211,21 +322,14 @@ app.MapPost("/api/v1/auth/login", async (
     }
 
     return Results.Redirect("/?error=1");
-}).DisableAntiforgery();
+}
 
-app.MapGet("/api/v1/auth/logout", (HttpContext httpContext) =>
-{
-    httpContext.Response.Cookies.Delete("NutriAI.AuthToken");
-    return Results.Redirect("/");
-});
-
-// ─── Endpoint RAG: POST /api/v1/assistente/query ─────────────────────────────
-app.MapPost("/api/v1/assistente/query", async (
+static async Task<IResult> HandleQueryAsync(
     HttpContext httpContext,
     AssistenteQuery request,
     AIService aiService,
     AuditoriaService auditoriaService,
-    ApplicationDbContext db) =>
+    ApplicationDbContext db)
 {
     if (!httpContext.User.Identity?.IsAuthenticated ?? true)
         return Results.Unauthorized();
@@ -278,90 +382,4 @@ app.MapPost("/api/v1/assistente/query", async (
         request.ConsentimentoLGPD);
 
     return Results.Ok(response);
-
-}).RequireAuthorization().DisableAntiforgery().RequireRateLimiting("ia-policy");
-
-// ─── Endpoint RAG: GET /api/v1/assistente/audit/{pacienteId} ─────────────────
-app.MapGet("/api/v1/assistente/audit/{pacienteId:int}", async (
-    int pacienteId,
-    HttpContext httpContext,
-    AuditoriaService auditoriaService,
-    ApplicationDbContext db) =>
-{
-    if (!httpContext.User.Identity?.IsAuthenticated ?? true)
-        return Results.Unauthorized();
-
-    var userIdClaim = httpContext.User.FindFirst("UsuarioId")?.Value;
-    if (!int.TryParse(userIdClaim, out int userId))
-        return Results.Unauthorized();
-
-    var pacienteExiste = await db.Pacientes
-        .AnyAsync(p => p.Id == pacienteId && p.UsuarioId == userId);
-
-    if (!pacienteExiste)
-        return Results.Forbid();
-
-    var logs = await auditoriaService.GetLogsPorPacienteAsync(pacienteId, userId.ToString());
-    return Results.Ok(logs);
-
-}).RequireAuthorization();
-
-// ─── Endpoint RAG: GET /api/v1/assistente/metricas ───────────────────────────
-app.MapGet("/api/v1/assistente/metricas", async (
-    HttpContext httpContext,
-    AuditoriaService auditoriaService) =>
-{
-    if (!httpContext.User.Identity?.IsAuthenticated ?? true)
-        return Results.Unauthorized();
-
-    var userIdClaim = httpContext.User.FindFirst("UsuarioId")?.Value;
-    if (string.IsNullOrEmpty(userIdClaim)) return Results.Unauthorized();
-
-    var metricas = await auditoriaService.GetMetricasAsync(userIdClaim);
-    return Results.Ok(metricas);
-
-}).RequireAuthorization();
-
-// ─── Blazor ───────────────────────────────────────────────────────────────
-// ─── Migrações Automáticas ────────────────────────────────────────────────
-using (var scope = app.Services.CreateScope())
-{
-    var services = scope.ServiceProvider;
-    var logger = services.GetRequiredService<ILogger<Program>>();
-    var db = services.GetRequiredService<ApplicationDbContext>();
-    
-    for (int i = 1; i <= 12; i++)
-    {
-        try
-        {
-            logger.LogInformation("Aplicando migrações do banco de dados (Tentativa {Tentativa}/12)...", i);
-            db.Database.Migrate();
-            logger.LogInformation("Banco de dados pronto e migrações aplicadas com sucesso!");
-            break;
-        }
-        catch (Exception ex)
-        {
-            // Se as tabelas já existem, podemos prosseguir normalmente
-            if (ex.Message.Contains("Já existe um objeto com nome") || 
-                ex.Message.Contains("already exists") || 
-                ex.Message.Contains("there is already an object"))
-            {
-                logger.LogWarning("O banco de dados já possui a estrutura de tabelas criada. Ignorando migração inicial.");
-                break;
-            }
-
-            logger.LogWarning("SQL Server não está pronto: {Message}. Aguardando 5 segundos...", ex.Message);
-            if (i == 12)
-            {
-                logger.LogError(ex, "Falha de conexão com o banco após 12 tentativas.");
-                throw;
-            }
-            Thread.Sleep(5000);
-        }
-    }
 }
-
-app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode();
-
-app.Run();

@@ -409,7 +409,7 @@
         StateHasChanged();
     }
 
-    private RenderFragment GetFonteNavigationLink(SourceReference src) => builder =>
+    private static RenderFragment GetFonteNavigationLink(SourceReference src) => builder =>
     {
         var url = src.Tabela switch
         {

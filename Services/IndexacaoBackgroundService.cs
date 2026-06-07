@@ -12,7 +12,6 @@ namespace NutriFlow.Services
     /// </summary>
     public class IndexacaoBackgroundService : BackgroundService
     {
-        private readonly Channel<IndexacaoRequest> _channel;
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly ILogger<IndexacaoBackgroundService> _logger;
 
@@ -28,15 +27,15 @@ namespace NutriFlow.Services
             _logger = logger;
 
             // Canal bounded: máximo 50 requisições pendentes para evitar sobrecarga
-            _channel = Channel.CreateBounded<IndexacaoRequest>(new BoundedChannelOptions(50)
+            var channel = Channel.CreateBounded<IndexacaoRequest>(new BoundedChannelOptions(50)
             {
                 FullMode = BoundedChannelFullMode.DropOldest, // descarta a mais antiga se cheio
                 SingleReader = true,
                 SingleWriter = false
             });
 
-            _writer = _channel.Writer;
-            _reader = _channel.Reader;
+            _writer = channel.Writer;
+            _reader = channel.Reader;
         }
 
         /// <summary>

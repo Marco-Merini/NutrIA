@@ -97,21 +97,18 @@
             $"Tem certeza que deseja deletar o paciente {paciente.Nome}? Esta ação não pode ser desfeita e todas as informações serão perdidas.", 
             yesText: "Sim, Excluir", cancelText: "Cancelar");
             
-        if (result == true)
+        if (result == true && AuthService.CurrentUser != null)
         {
-            if (AuthService.CurrentUser != null)
+            var success = await PacienteService.DeletePacienteAsync(paciente.Id, AuthService.CurrentUser.Id);
+            if (success)
             {
-                var success = await PacienteService.DeletePacienteAsync(paciente.Id, AuthService.CurrentUser.Id);
-                if (success)
-                {
-                    pacientes.Remove(paciente);
-                    Snackbar.Add("Paciente deletado com sucesso.", Severity.Success);
-                    StateHasChanged();
-                }
-                else
-                {
-                    Snackbar.Add("Erro ao deletar paciente.", Severity.Error);
-                }
+                pacientes.Remove(paciente);
+                Snackbar.Add("Paciente deletado com sucesso.", Severity.Success);
+                StateHasChanged();
+            }
+            else
+            {
+                Snackbar.Add("Erro ao deletar paciente.", Severity.Error);
             }
         }
     }
