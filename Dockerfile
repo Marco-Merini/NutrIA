@@ -6,8 +6,17 @@ WORKDIR /src
 COPY ["NutriFlow.csproj", "./"]
 RUN dotnet restore "NutriFlow.csproj"
 
-# Copiar todo o restante e compilar
-COPY . .
+# Copiar apenas os arquivos de código e recursos necessários para compilação (evitando COPY . .)
+COPY Components/ ./Components/
+COPY Data/ ./Data/
+COPY Migrations/ ./Migrations/
+COPY Models/ ./Models/
+COPY Services/ ./Services/
+COPY Properties/ ./Properties/
+COPY wwwroot/ ./wwwroot/
+COPY Program.cs ./
+COPY appsettings.json ./
+
 RUN dotnet build "NutriFlow.csproj" -c Release -o /app/build
 
 # Stage 2: Publish
