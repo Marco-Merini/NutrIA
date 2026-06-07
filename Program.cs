@@ -33,14 +33,7 @@ builder.Services.AddMudServices(config =>
 });
 
 // ─── Banco de Dados ───────────────────────────────────────────────────────
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
-
-if (Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") != "true")
-{
-    connectionString = connectionString.Replace("host.docker.internal", "localhost");
-}
-
+var connectionString = GetConnectionString(builder.Configuration);
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(connectionString));
 
@@ -51,10 +44,7 @@ builder.Services.AddScoped<AuditoriaService>();
 builder.Services.AddScoped<IPacienteService, PacienteService>();
 
 // AIService como Singleton: mantém índice em memória entre requests
-var openaiApiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY")
-    ?? builder.Configuration["OpenAI:ApiKey"]
-    ?? throw new InvalidOperationException(
-        "OpenAI API Key not found. Set OPENAI_API_KEY environment variable or configure OpenAI:ApiKey in appsettings.json");
+var openaiApiKey = GetOpenAiApiKey(builder.Configuration);
 builder.Services.AddSingleton<AIService>(sp => new AIService(
     openaiApiKey,
     sp.GetRequiredService<IServiceScopeFactory>(),
@@ -62,15 +52,12 @@ builder.Services.AddSingleton<AIService>(sp => new AIService(
 ));
 
 // BackgroundService de re-indexação incremental
-// Registrado como Singleton para permitir injeção direta em outros serviços
 builder.Services.AddSingleton<IndexacaoBackgroundService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<IndexacaoBackgroundService>());
 
 // ─── Autenticação JWT ─────────────────────────────────────────────────────
 var jwtSettings = builder.Configuration.GetSection("Jwt");
-var jwtKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY")
-    ?? builder.Configuration.GetValue<string>("Jwt:Key")
-    ?? throw new InvalidOperationException("JWT secret key not configured. Set JWT_SECRET_KEY env var or use dotnet user-secrets.");
+var jwtKey = GetJwtKey(builder.Configuration);
 var key = Encoding.UTF8.GetBytes(jwtKey);
 var expireHours = int.Parse(jwtSettings["ExpireHours"] ?? "24");
 
@@ -79,31 +66,7 @@ builder.Services.AddAuthentication(options =>
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
     options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
 })
-.AddJwtBearer(options =>
-{
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuer = true,
-        ValidateAudience = true,
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
-        ValidIssuer = jwtSettings["Issuer"],
-        ValidAudience = jwtSettings["Audience"],
-        IssuerSigningKey = new SymmetricSecurityKey(key)
-    };
-
-    // Lê JWT do cookie em vez do header Authorization
-    options.Events = new JwtBearerEvents
-    {
-        OnMessageReceived = context =>
-        {
-            var token = context.Request.Cookies["NutriAI.AuthToken"];
-            if (!string.IsNullOrEmpty(token))
-                context.Token = token;
-            return Task.CompletedTask;
-        }
-    };
-});
+.AddJwtBearer(options => ConfigureJwt(options, key, jwtSettings));
 
 builder.Services.AddAuthorization();
 builder.Services.AddHttpContextAccessor();
@@ -125,7 +88,115 @@ builder.Services.AddRateLimiter(options =>
 
 // ─── Swagger/OpenAPI ──────────────────────────────────────────────────────
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
+builder.Services.AddSwaggerGen(c => ConfigureSwagger(c));
+
+builder.Services.AddControllers();
+
+var app = builder.Build();
+
+// ─── Pipeline HTTP ─────────────────────────────────────────────────────────
+ConfigurePipeline(app);
+
+// ─── Endpoints de Autenticação ────────────────────────────────────────────
+app.MapPost("/api/v1/auth/login", async (
+    HttpContext httpContext,
+    [Microsoft.AspNetCore.Mvc.FromForm] string email,
+    [Microsoft.AspNetCore.Mvc.FromForm] string senha,
+    AuthService authService) => await HandleLoginAsync(httpContext, email, senha, authService, expireHours)).DisableAntiforgery();
+
+app.MapGet("/api/v1/auth/logout", (HttpContext httpContext) => HandleLogout(httpContext));
+
+// ─── Endpoints RAG ────────────────────────────────────────────────────────
+app.MapPost("/api/v1/assistente/query", async (
+    HttpContext httpContext,
+    AssistenteQuery request,
+    AIService aiService,
+    AuditoriaService auditoriaService,
+    ApplicationDbContext db) => await HandleQueryAsync(httpContext, request, aiService, auditoriaService, db))
+.RequireAuthorization().DisableAntiforgery().RequireRateLimiting("ia-policy");
+
+app.MapGet("/api/v1/assistente/audit/{pacienteId:int}", async (
+    int pacienteId,
+    HttpContext httpContext,
+    AuditoriaService auditoriaService,
+    ApplicationDbContext db) => await HandleAuditAsync(pacienteId, httpContext, auditoriaService, db))
+.RequireAuthorization();
+
+app.MapGet("/api/v1/assistente/metricas", async (
+    HttpContext httpContext,
+    AuditoriaService auditoriaService) => await HandleMetricasAsync(httpContext, auditoriaService))
+.RequireAuthorization();
+
+// ─── Migrações Automáticas ────────────────────────────────────────────────
+await ApplyMigrationsAsync(app);
+
+app.MapRazorComponents<App>()
+    .AddInteractiveServerRenderMode();
+
+app.Run();
+
+// ─── Funções Auxiliares Locais ─────────────────────────────────────────────
+
+static string GetConnectionString(IConfiguration configuration)
+{
+    var connectionString = configuration.GetConnectionString("DefaultConnection")
+        ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+
+    var dbSecret = configuration["DbSettings:Secret"];
+    if (!string.IsNullOrEmpty(dbSecret))
+    {
+        connectionString = connectionString.Replace("SecretKeyPlaceholder=True;", $"Password={dbSecret};");
+    }
+
+    if (Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") != "true")
+    {
+        connectionString = connectionString.Replace("host.docker.internal", "localhost");
+    }
+
+    return connectionString;
+}
+
+static string GetOpenAiApiKey(IConfiguration configuration)
+{
+    return Environment.GetEnvironmentVariable("OPENAI_API_KEY")
+        ?? configuration["OpenAI:ApiKey"]
+        ?? throw new InvalidOperationException(
+            "OpenAI API Key not found. Set OPENAI_API_KEY environment variable or configure OpenAI:ApiKey in appsettings.json");
+}
+
+static string GetJwtKey(IConfiguration configuration)
+{
+    return Environment.GetEnvironmentVariable("JWT_SECRET_KEY")
+        ?? configuration.GetValue<string>("Jwt:Key")
+        ?? throw new InvalidOperationException("JWT secret key not configured. Set JWT_SECRET_KEY env var or use dotnet user-secrets.");
+}
+
+static void ConfigureJwt(JwtBearerOptions options, byte[] key, IConfigurationSection jwtSettings)
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = jwtSettings["Issuer"],
+        ValidAudience = jwtSettings["Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(key)
+    };
+
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            var token = context.Request.Cookies["NutriAI.AuthToken"];
+            if (!string.IsNullOrEmpty(token))
+                context.Token = token;
+            return Task.CompletedTask;
+        }
+    };
+}
+
+static void ConfigureSwagger(Swashbuckle.AspNetCore.SwaggerGen.SwaggerGenOptions c)
 {
     c.SwaggerDoc("v1", new OpenApiInfo
     {
@@ -157,110 +228,39 @@ builder.Services.AddSwaggerGen(c =>
             Array.Empty<string>()
         }
     });
-});
-
-builder.Services.AddControllers();
-
-var app = builder.Build();
-
-// ─── Pipeline HTTP ─────────────────────────────────────────────────────────
-if (!app.Environment.IsDevelopment())
-{
-    app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    app.UseHsts();
 }
 
-app.UseHttpsRedirection();
-app.UseStaticFiles();
-app.UseAntiforgery();
-
-if (app.Environment.IsDevelopment())
+static void ConfigurePipeline(WebApplication app)
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
+    if (!app.Environment.IsDevelopment())
     {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "NutrIA API v1");
-    });
+        app.UseExceptionHandler("/Error", createScopeForErrors: true);
+        app.UseHsts();
+    }
+
+    app.UseHttpsRedirection();
+    app.UseStaticFiles();
+    app.UseAntiforgery();
+
+    if (app.Environment.IsDevelopment())
+    {
+        app.UseSwagger();
+        app.UseSwaggerUI(c =>
+        {
+            c.SwaggerEndpoint("/swagger/v1/swagger.json", "NutrIA API v1");
+        });
+    }
+
+    app.UseRateLimiter();
+    app.UseAuthentication();
+    app.UseAuthorization();
 }
 
-app.UseRateLimiter();
-
-app.UseAuthentication();
-app.UseAuthorization();
-
-// ─── Endpoints de Autenticação ────────────────────────────────────────────
-app.MapPost("/api/v1/auth/login", async (
-    HttpContext httpContext,
-    [Microsoft.AspNetCore.Mvc.FromForm] string email,
-    [Microsoft.AspNetCore.Mvc.FromForm] string senha,
-    AuthService authService) => await HandleLoginAsync(httpContext, email, senha, authService, expireHours)).DisableAntiforgery();
-
-app.MapGet("/api/v1/auth/logout", (HttpContext httpContext) =>
+static IResult HandleLogout(HttpContext httpContext)
 {
     httpContext.Response.Cookies.Delete("NutriAI.AuthToken");
     return Results.Redirect("/");
-});
-
-// ─── Endpoint RAG: POST /api/v1/assistente/query ─────────────────────────────
-app.MapPost("/api/v1/assistente/query", async (
-    HttpContext httpContext,
-    AssistenteQuery request,
-    AIService aiService,
-    AuditoriaService auditoriaService,
-    ApplicationDbContext db) => await HandleQueryAsync(httpContext, request, aiService, auditoriaService, db))
-.RequireAuthorization().DisableAntiforgery().RequireRateLimiting("ia-policy");
-
-// ─── Endpoint RAG: GET /api/v1/assistente/audit/{pacienteId} ─────────────────
-app.MapGet("/api/v1/assistente/audit/{pacienteId:int}", async (
-    int pacienteId,
-    HttpContext httpContext,
-    AuditoriaService auditoriaService,
-    ApplicationDbContext db) =>
-{
-    if (!httpContext.User.Identity?.IsAuthenticated ?? true)
-        return Results.Unauthorized();
-
-    var userIdClaim = httpContext.User.FindFirst("UsuarioId")?.Value;
-    if (!int.TryParse(userIdClaim, out int userId))
-        return Results.Unauthorized();
-
-    var pacienteExiste = await db.Pacientes
-        .AnyAsync(p => p.Id == pacienteId && p.UsuarioId == userId);
-
-    if (!pacienteExiste)
-        return Results.Forbid();
-
-    var logs = await auditoriaService.GetLogsPorPacienteAsync(pacienteId, userId.ToString());
-    return Results.Ok(logs);
-
-}).RequireAuthorization();
-
-// ─── Endpoint RAG: GET /api/v1/assistente/metricas ───────────────────────────
-app.MapGet("/api/v1/assistente/metricas", async (
-    HttpContext httpContext,
-    AuditoriaService auditoriaService) =>
-{
-    if (!httpContext.User.Identity?.IsAuthenticated ?? true)
-        return Results.Unauthorized();
-
-    var userIdClaim = httpContext.User.FindFirst("UsuarioId")?.Value;
-    if (string.IsNullOrEmpty(userIdClaim)) return Results.Unauthorized();
-
-    var metricas = await auditoriaService.GetMetricasAsync(userIdClaim);
-    return Results.Ok(metricas);
-
-}).RequireAuthorization();
-
-// ─── Blazor ───────────────────────────────────────────────────────────────
-// ─── Migrações Automáticas ────────────────────────────────────────────────
-await ApplyMigrationsAsync(app);
-
-app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode();
-
-app.Run();
-
-// ─── Funções Auxiliares Locais ─────────────────────────────────────────────
+}
 
 static async Task ApplyMigrationsAsync(WebApplication app)
 {
@@ -280,7 +280,6 @@ static async Task ApplyMigrationsAsync(WebApplication app)
         }
         catch (Exception ex)
         {
-            // Se as tabelas já existem, podemos prosseguir normalmente
             if (ex.Message.Contains("Já existe um objeto com nome") || 
                 ex.Message.Contains("already exists") || 
                 ex.Message.Contains("there is already an object"))
@@ -341,7 +340,6 @@ static async Task<IResult> HandleQueryAsync(
     if (!request.ConsentimentoLGPD)
         return Results.BadRequest(new { error = "Consentimento LGPD obrigatório para consultas à IA." });
 
-    // 4. Verificar que o pacienteId pertence ao userId autenticado (ownership check)
     var paciente = await db.Pacientes
         .AsNoTracking()
         .Include(p => p.Sessoes)
@@ -351,9 +349,8 @@ static async Task<IResult> HandleQueryAsync(
         .FirstOrDefaultAsync(p => p.Id == request.PacienteId && p.UsuarioId == userId);
 
     if (paciente == null)
-        return Results.Forbid(); // paciente não existe ou não pertence ao usuário
+        return Results.Forbid();
 
-    // 5. Verificar/carregar índice do paciente (do banco se não estiver em memória)
     if (!aiService.IsIndexed(request.PacienteId))
     {
         var loaded = await aiService.LoadIndexFromDbAsync(request.PacienteId);
@@ -382,4 +379,41 @@ static async Task<IResult> HandleQueryAsync(
         request.ConsentimentoLGPD);
 
     return Results.Ok(response);
+}
+
+static async Task<IResult> HandleAuditAsync(
+    int pacienteId,
+    HttpContext httpContext,
+    AuditoriaService auditoriaService,
+    ApplicationDbContext db)
+{
+    if (!httpContext.User.Identity?.IsAuthenticated ?? true)
+        return Results.Unauthorized();
+
+    var userIdClaim = httpContext.User.FindFirst("UsuarioId")?.Value;
+    if (!int.TryParse(userIdClaim, out int userId))
+        return Results.Unauthorized();
+
+    var pacienteExiste = await db.Pacientes
+        .AnyAsync(p => p.Id == pacienteId && p.UsuarioId == userId);
+
+    if (!pacienteExiste)
+        return Results.Forbid();
+
+    var logs = await auditoriaService.GetLogsPorPacienteAsync(pacienteId, userId.ToString());
+    return Results.Ok(logs);
+}
+
+static async Task<IResult> HandleMetricasAsync(
+    HttpContext httpContext,
+    AuditoriaService auditoriaService)
+{
+    if (!httpContext.User.Identity?.IsAuthenticated ?? true)
+        return Results.Unauthorized();
+
+    var userIdClaim = httpContext.User.FindFirst("UsuarioId")?.Value;
+    if (string.IsNullOrEmpty(userIdClaim)) return Results.Unauthorized();
+
+    var metricas = await auditoriaService.GetMetricasAsync(userIdClaim);
+    return Results.Ok(metricas);
 }
