@@ -4,7 +4,7 @@
 @using NutriFlow.Data
 @using NutriFlow.Models
 @using Microsoft.EntityFrameworkCore
-@inject ApplicationDbContext DbContext
+@inject NutriFlow.Services.IPacienteService PacienteService
 @inject IDialogService DialogService
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
@@ -83,19 +83,10 @@
 
     private async Task LoadPacientes()
     {
-        try 
+        if (AuthService.CurrentUser != null)
         {
-            if (AuthService.CurrentUser != null)
-            {
-                var userId = AuthService.CurrentUser.Id;
-                pacientes = await DbContext.Pacientes
-                    .Where(p => p.UsuarioId == userId)
-                    .ToListAsync();
-            }
-        }
-        catch 
-        {
-            Snackbar.Add("Erro ao carregar pacientes do banco de dados.", Severity.Error);
+            var userId = AuthService.CurrentUser.Id;
+            pacientes = await PacienteService.GetPacientesByUsuarioIdAsync(userId);
         }
     }
 
@@ -106,20 +97,18 @@
             $"Tem certeza que deseja deletar o paciente {paciente.Nome}? Esta ação não pode ser desfeita e todas as informações serão perdidas.", 
             yesText: "Sim, Excluir", cancelText: "Cancelar");
             
-        if (result == true)
+        if (result == true && AuthService.CurrentUser != null)
         {
-            try
+            var success = await PacienteService.DeletePacienteAsync(paciente.Id, AuthService.CurrentUser.Id);
+            if (success)
             {
-                DbContext.Pacientes.Remove(paciente);
-                await DbContext.SaveChangesAsync();
-                
                 pacientes.Remove(paciente);
                 Snackbar.Add("Paciente deletado com sucesso.", Severity.Success);
                 StateHasChanged();
             }
-            catch (Exception ex)
+            else
             {
-                Snackbar.Add($"Erro ao deletar paciente: {ex.Message}", Severity.Error);
+                Snackbar.Add("Erro ao deletar paciente.", Severity.Error);
             }
         }
     }

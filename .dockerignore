@@ -1,0 +1,33 @@
+# Excluir segredos e configurações locais
+.env
+*.user
+appsettings.Development.json
+
+# Excluir controle de versão
+.git
+.github
+.gitignore
+
+# Excluir diretórios de build locais
+bin/
+obj/
+publish/
+
+# Excluir IDEs e arquivos do sistema
+.vs/
+.idea/
+.vscode/
+*.suo
+*.user
+*.sln
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Excluir documentação e scripts adicionais
+README.md
+RFC/
+Scripts/
+docker-compose.yml
+Dockerfile
+.dockerignore

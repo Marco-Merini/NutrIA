@@ -9,6 +9,7 @@
 @inject ISnackbar Snackbar
 @inject NutriFlow.Services.AuthService AuthService
 @inject NutriFlow.Services.AIService AIService
+@inject NutriFlow.Services.IndexacaoBackgroundService IndexacaoBackground
 
 <PageTitle>Novo Plano Alimentar - NutriAI</PageTitle>
 
@@ -265,6 +266,11 @@
             {
                 DbContext.Refeicoes.AddRange(refeicoes);
                 await DbContext.SaveChangesAsync();
+            }
+
+            if (plano.PacienteId.HasValue)
+            {
+                IndexacaoBackground.EnquileirarReindexacao(plano.PacienteId.Value, "criação de plano alimentar");
             }
 
             Snackbar.Add("Plano alimentar criado com sucesso!", Severity.Success);

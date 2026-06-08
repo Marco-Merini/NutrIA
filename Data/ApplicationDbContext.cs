@@ -10,12 +10,17 @@ namespace NutriFlow.Data
         {
         }
 
+        // Entidades originais
         public DbSet<Usuario> Usuarios { get; set; }
         public DbSet<Paciente> Pacientes { get; set; }
         public DbSet<PlanoDieta> PlanosDieta { get; set; }
         public DbSet<Refeicao> Refeicoes { get; set; }
         public DbSet<Sessao> Sessoes { get; set; }
         public DbSet<Progresso> Progressos { get; set; }
+
+        // Entidades do sistema RAG
+        public DbSet<EmbeddingChunk> Embeddings { get; set; }
+        public DbSet<AuditLog> AuditLogs { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -56,6 +61,21 @@ namespace NutriFlow.Data
             modelBuilder.Entity<Sessao>(entity =>
             {
                 entity.Property(e => e.PesoSessao).HasPrecision(5, 2);
+            });
+
+            // EmbeddingChunk — índices para busca eficiente
+            modelBuilder.Entity<EmbeddingChunk>(entity =>
+            {
+                entity.HasIndex(e => e.PatientId).HasDatabaseName("IX_Embeddings_PatientId");
+                entity.HasIndex(e => new { e.PatientId, e.SourceTable }).HasDatabaseName("IX_Embeddings_PatientId_SourceTable");
+            });
+
+            // AuditLog — índice por UserId e PatientId para consultas de auditoria
+            modelBuilder.Entity<AuditLog>(entity =>
+            {
+                entity.HasIndex(e => e.UserId).HasDatabaseName("IX_AuditLogs_UserId");
+                entity.HasIndex(e => e.PatientId).HasDatabaseName("IX_AuditLogs_PatientId");
+                entity.HasIndex(e => e.Timestamp).HasDatabaseName("IX_AuditLogs_Timestamp");
             });
         }
     }
