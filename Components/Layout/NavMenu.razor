@@ -1,5 +1,5 @@
 @rendermode InteractiveServer
-@inject NutriFlow.Services.AuthService AuthService
+@inject NutriFlow.Services.IAuthService AuthService
 @inject NavigationManager NavigationManager
 @inject IDialogService DialogService
 
@@ -17,6 +17,9 @@
         <MudButton Variant="Variant.Text" Color="Color.Error" StartIcon="@Icons.Material.Filled.Logout" FullWidth="true" Class="justify-start text-none py-2 font-bold" OnClick="OpenLogoutDialog">
             Sair
         </MudButton>
+        <div class="text-center mt-2" style="font-size: 0.75rem; color: #878a94; font-family: sans-serif;">
+            v1.1.0 - NutrIA
+        </div>
     </div>
 </div>
 

@@ -1,13 +1,14 @@
 @page "/progresso"
 @attribute [Authorize]
 @rendermode InteractiveServer
-@using NutriFlow.Data
-@using Microsoft.EntityFrameworkCore
-@inject ApplicationDbContext DbContext
+@using NutriFlow.Models
+@using NutriFlow.Services
+@inject IProgressoService ProgressoService
+@inject IPacienteService PacienteService
+@inject IAuthService AuthService
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
-@inject NutriFlow.Services.AuthService AuthService
 
 <PageTitle>Progresso - NutriAI</PageTitle>
 
@@ -172,18 +173,19 @@ else
         {
             var userId = AuthService.CurrentUser!.Id;
 
-            pacientes = await DbContext.Pacientes
-                .Where(p => p.UsuarioId == userId)
-                .OrderBy(p => p.Nome)
-                .ToListAsync();
+            pacientes = await PacienteService.GetPacientesByUsuarioIdAsync(userId);
 
-            var pacienteIds = pacientes.Select(p => p.Id).ToList();
-
-            progressos = await DbContext.Progressos
-                .Include(p => p.Paciente)
-                .Where(p => p.PacienteId != null && pacienteIds.Contains(p.PacienteId.Value))
-                .OrderByDescending(p => p.DataRegistro)
-                .ToListAsync();
+            var resultProgressos = new List<NutriFlow.Models.Progresso>();
+            foreach (var p in pacientes)
+            {
+                var pacProgressos = await ProgressoService.GetProgressosPorPacienteAsync(p.Id);
+                foreach (var prg in pacProgressos)
+                {
+                    prg.Paciente = p;
+                }
+                resultProgressos.AddRange(pacProgressos);
+            }
+            progressos = resultProgressos.OrderByDescending(p => p.DataRegistro).ToList();
 
             AtualizarGrafico();
         }
@@ -263,8 +265,7 @@ else
 
         try
         {
-            DbContext.Progressos.Remove(progresso);
-            await DbContext.SaveChangesAsync();
+            await ProgressoService.DeleteProgressoAsync(progresso.Id);
             progressos.Remove(progresso);
             AtualizarGrafico();
             Snackbar.Add("Progresso excluído com sucesso.", Severity.Success);

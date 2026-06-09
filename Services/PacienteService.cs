@@ -1,17 +1,20 @@
-using NutriFlow.Data;
 using NutriFlow.Models;
-using Microsoft.EntityFrameworkCore;
+using NutriFlow.Repositories;
+using Microsoft.Extensions.Logging;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace NutriFlow.Services
 {
     public class PacienteService : IPacienteService
     {
-        private readonly ApplicationDbContext _dbContext;
+        private readonly IPacienteRepository _pacienteRepository;
         private readonly ILogger<PacienteService> _logger;
 
-        public PacienteService(ApplicationDbContext dbContext, ILogger<PacienteService> logger)
+        public PacienteService(IPacienteRepository pacienteRepository, ILogger<PacienteService> logger)
         {
-            _dbContext = dbContext;
+            _pacienteRepository = pacienteRepository;
             _logger = logger;
         }
 
@@ -19,11 +22,7 @@ namespace NutriFlow.Services
         {
             try
             {
-                return await _dbContext.Pacientes
-                    .AsNoTracking()
-                    .Where(p => p.UsuarioId == usuarioId)
-                    .OrderBy(p => p.Nome)
-                    .ToListAsync();
+                return await _pacienteRepository.GetPacientesByUsuarioIdAsync(usuarioId);
             }
             catch (Exception ex)
             {
@@ -36,17 +35,25 @@ namespace NutriFlow.Services
         {
             try
             {
-                return await _dbContext.Pacientes
-                    .Include(p => p.Sessoes)
-                    .Include(p => p.Progressos)
-                    .Include(p => p.PlanosDieta)
-                        .ThenInclude(pd => pd.Refeicoes)
-                    .FirstOrDefaultAsync(p => p.Id == id && p.UsuarioId == usuarioId);
+                return await _pacienteRepository.GetPacienteCompletoAsync(id, usuarioId);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Erro ao buscar paciente {Id} do usuário {UsuarioId}", id, usuarioId);
                 return null;
+            }
+        }
+
+        public async Task<List<Paciente>> GetPacientesRecentesAsync(int usuarioId, int count)
+        {
+            try
+            {
+                return await _pacienteRepository.GetPacientesRecentesAsync(usuarioId, count);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao buscar pacientes recentes do usuário {UsuarioId}", usuarioId);
+                return new List<Paciente>();
             }
         }
 
@@ -58,8 +65,8 @@ namespace NutriFlow.Services
                 paciente.DataAtualizacao = DateTime.Now;
                 paciente.Status = "ativo";
                 
-                await _dbContext.Pacientes.AddAsync(paciente);
-                await _dbContext.SaveChangesAsync();
+                await _pacienteRepository.AddAsync(paciente);
+                await _pacienteRepository.SaveChangesAsync();
                 return true;
             }
             catch (Exception ex)
@@ -73,7 +80,8 @@ namespace NutriFlow.Services
         {
             try
             {
-                var existing = await _dbContext.Pacientes.FirstOrDefaultAsync(p => p.Id == paciente.Id && p.UsuarioId == paciente.UsuarioId);
+                if (paciente.UsuarioId == null) return false;
+                var existing = await _pacienteRepository.GetPacienteCompletoAsync(paciente.Id, paciente.UsuarioId.Value);
                 if (existing == null) return false;
 
                 existing.Nome = paciente.Nome;
@@ -92,8 +100,8 @@ namespace NutriFlow.Services
                 existing.Status = paciente.Status;
                 existing.DataAtualizacao = DateTime.Now;
 
-                _dbContext.Pacientes.Update(existing);
-                await _dbContext.SaveChangesAsync();
+                _pacienteRepository.Update(existing);
+                await _pacienteRepository.SaveChangesAsync();
                 return true;
             }
             catch (Exception ex)
@@ -107,11 +115,11 @@ namespace NutriFlow.Services
         {
             try
             {
-                var paciente = await _dbContext.Pacientes.FirstOrDefaultAsync(p => p.Id == id && p.UsuarioId == usuarioId);
+                var paciente = await _pacienteRepository.GetPacienteCompletoAsync(id, usuarioId);
                 if (paciente == null) return false;
 
-                _dbContext.Pacientes.Remove(paciente);
-                await _dbContext.SaveChangesAsync();
+                _pacienteRepository.Delete(paciente);
+                await _pacienteRepository.SaveChangesAsync();
                 return true;
             }
             catch (Exception ex)

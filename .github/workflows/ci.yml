@@ -1,4 +1,4 @@
-name: NutrIA CI Pipeline
+name: NutrIA CI/CD Pipeline
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [ main, master ]
 
 jobs:
-  build-and-test:
+  build-test-and-package:
     runs-on: ubuntu-latest
 
     steps:
@@ -25,5 +25,10 @@ jobs:
     - name: Compilar Solução (Release)
       run: dotnet build --no-restore -c Release
 
-    - name: Executar Testes Unitários
-      run: dotnet test --no-build -c Release --verbosity normal
+    - name: Executar Testes Unitários com Cobertura
+      run: |
+        dotnet test --no-build -c Release --verbosity normal /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura
+
+    - name: Validar Docker Build (Continuous Delivery)
+      run: |
+        docker build -t nutri-app:latest .

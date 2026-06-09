@@ -1,25 +1,28 @@
 using NutriFlow.Models;
-using NutriFlow.Data;
-using Microsoft.EntityFrameworkCore;
+using NutriFlow.Repositories;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 
 namespace NutriFlow.Services
 {
-    public class AuthService
+    public class AuthService : IAuthService
     {
-        private readonly ApplicationDbContext _dbContext;
+        private readonly IUsuarioRepository _usuarioRepository;
         private readonly AuthenticationStateProvider _authStateProvider;
         private readonly IConfiguration _configuration;
         private Usuario? _currentUser;
         private bool _isInitialized;
 
-        public AuthService(ApplicationDbContext dbContext, AuthenticationStateProvider authStateProvider, IConfiguration configuration)
+        public AuthService(IUsuarioRepository usuarioRepository, AuthenticationStateProvider authStateProvider, IConfiguration configuration)
         {
-            _dbContext = dbContext;
+            _usuarioRepository = usuarioRepository;
             _authStateProvider = authStateProvider;
             _configuration = configuration;
         }
@@ -37,7 +40,7 @@ namespace NutriFlow.Services
 
                 if (int.TryParse(userClaim, out int userId) && userId > 0)
                 {
-                    _currentUser = await _dbContext.Usuarios.FindAsync(userId);
+                    _currentUser = await _usuarioRepository.GetByIdAsync(userId);
                 }
                 else
                 {
@@ -86,7 +89,7 @@ namespace NutriFlow.Services
 
         public async Task<(bool Success, string? Token)> LoginAsync(string email, string senha)
         {
-            var user = await _dbContext.Usuarios.FirstOrDefaultAsync(u => u.Email == email && u.Ativo == "S");
+            var user = await _usuarioRepository.GetByEmailAsync(email);
 
             if (user == null || string.IsNullOrEmpty(user.Senha))
             {
@@ -106,7 +109,7 @@ namespace NutriFlow.Services
         {
             try
             {
-                var exists = await _dbContext.Usuarios.AnyAsync(u => u.Nome == newUser.Nome || u.Email == newUser.Email);
+                var exists = await _usuarioRepository.ExisteUsuarioAsync(newUser.Nome ?? "", newUser.Email ?? "");
                 if (exists)
                 {
                     return false;
@@ -114,8 +117,8 @@ namespace NutriFlow.Services
 
                 newUser.Senha = BCrypt.Net.BCrypt.HashPassword(newUser.Senha);
 
-                await _dbContext.Usuarios.AddAsync(newUser);
-                await _dbContext.SaveChangesAsync();
+                await _usuarioRepository.AddAsync(newUser);
+                await _usuarioRepository.SaveChangesAsync();
 
                 return true;
             }
@@ -130,7 +133,7 @@ namespace NutriFlow.Services
         {
             try
             {
-                var user = await _dbContext.Usuarios.FindAsync(updatedUser.Id);
+                var user = await _usuarioRepository.GetByIdAsync(updatedUser.Id);
                 if (user == null) return false;
 
                 user.Nome = updatedUser.Nome;
@@ -142,8 +145,8 @@ namespace NutriFlow.Services
 
                 user.DataAtualizacao = DateTime.Now;
 
-                _dbContext.Usuarios.Update(user);
-                await _dbContext.SaveChangesAsync();
+                _usuarioRepository.Update(user);
+                await _usuarioRepository.SaveChangesAsync();
 
                 if (_currentUser?.Id == user.Id)
                 {

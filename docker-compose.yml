@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   nutri-app:
     image: nutri-app:latest

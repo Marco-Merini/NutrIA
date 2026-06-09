@@ -5,6 +5,7 @@
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
 	  <UserSecretsId>e7170f71-c746-483b-936e-edcef17a14ff</UserSecretsId>
+		<Version>1.1.0</Version>
   </PropertyGroup>
 
 	<ItemGroup>
@@ -18,6 +19,8 @@
 		<PackageReference Include="OpenAI" Version="2.1.0" />
 		<PackageReference Include="System.Numerics.Tensors" Version="10.0.5" />
 		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+		<PackageReference Include="Serilog.AspNetCore" Version="8.0.2" />
+		<PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
 	</ItemGroup>
 
 	<ItemGroup>

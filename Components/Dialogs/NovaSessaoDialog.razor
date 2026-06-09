@@ -1,9 +1,9 @@
-@using NutriFlow.Data
 @using NutriFlow.Models
-@using Microsoft.EntityFrameworkCore
-@inject ApplicationDbContext DbContext
+@using NutriFlow.Services
+@inject ISessaoService SessaoService
+@inject IPacienteService PacienteService
+@inject IAuthService AuthService
 @inject ISnackbar Snackbar
-@inject NutriFlow.Services.AuthService AuthService
 
 <MudDialog>
     <TitleContent>
@@ -88,10 +88,7 @@
         await AuthService.InitializeAsync();
         if (AuthService.CurrentUser != null)
         {
-            Pacientes = await DbContext.Pacientes
-                .Where(p => p.UsuarioId == AuthService.CurrentUser.Id)
-                .OrderBy(p => p.Nome)
-                .ToListAsync();
+            Pacientes = await PacienteService.GetPacientesByUsuarioIdAsync(AuthService.CurrentUser.Id);
         }
     }
 
@@ -103,9 +100,7 @@
         IsSaving = true;
         try
         {
-            SessaoModel.DataCriacao = DateTime.Now;
-            DbContext.Sessoes.Add(SessaoModel);
-            await DbContext.SaveChangesAsync();
+            await SessaoService.AddSessaoAsync(SessaoModel);
 
             Snackbar.Add("Sessão registrada com sucesso!", Severity.Success);
             MudDialog.Close(DialogResult.Ok(true));

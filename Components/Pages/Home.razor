@@ -1,10 +1,11 @@
 @page "/home"
 @rendermode InteractiveServer
-@using NutriFlow.Data
 @using NutriFlow.Models
 @using NutriFlow.Services
-@using Microsoft.EntityFrameworkCore
-@inject ApplicationDbContext DbContext
+@inject IPacienteService PacienteService
+@inject IPlanoDietaService PlanoDietaService
+@inject IProgressoService ProgressoService
+@inject ISessaoService SessaoService
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
 @attribute [Authorize]
@@ -183,41 +184,20 @@
             var userIdStr = authState.User.FindFirst("UsuarioId")?.Value;
             if (!int.TryParse(userIdStr, out var userId)) return;
 
-            // IDs dos pacientes do usuário
-            var pacienteIds = await DbContext.Pacientes
-                .Where(p => p.UsuarioId == userId)
-                .Select(p => p.Id)
-                .ToListAsync();
-
             // Contadores
-            pacientesCount = pacienteIds.Count;
+            pacientesCount = (await PacienteService.GetPacientesByUsuarioIdAsync(userId)).Count;
 
-            planosCount = await DbContext.PlanosDieta
-                .Where(pd => pd.PacienteId != null && pacienteIds.Contains(pd.PacienteId.Value))
-                .CountAsync();
+            planosCount = await PlanoDietaService.GetPlanosCountPorUsuarioAsync(userId);
 
-            progressosCount = await DbContext.Progressos
-                .Where(pr => pr.PacienteId != null && pacienteIds.Contains(pr.PacienteId.Value))
-                .CountAsync();
+            progressosCount = await ProgressoService.GetProgressosCountPorUsuarioAsync(userId);
 
-            sessoesCount = await DbContext.Sessoes
-                .Where(s => s.PacienteId != null && pacienteIds.Contains(s.PacienteId.Value))
-                .CountAsync();
+            sessoesCount = await SessaoService.GetSessoesCountPorUsuarioAsync(userId);
 
-            // Pacientes recentes (últimos 5)
-            pacientesRecentes = await DbContext.Pacientes
-                .Where(p => p.UsuarioId == userId)
-                .OrderByDescending(p => p.DataCadastro)
-                .Take(3)
-                .ToListAsync();
+            // Pacientes recentes (últimos 3)
+            pacientesRecentes = await PacienteService.GetPacientesRecentesAsync(userId, 3);
 
-            // Sessões recentes (últimas 5)
-            sessoesRecentes = await DbContext.Sessoes
-                .Include(s => s.Paciente)
-                .Where(s => s.PacienteId != null && pacienteIds.Contains(s.PacienteId.Value))
-                .OrderByDescending(s => s.DataSessao)
-                .Take(3)
-                .ToListAsync();
+            // Sessões recentes (últimas 3)
+            sessoesRecentes = await SessaoService.GetSessoesRecentesPorUsuarioAsync(userId, 3);
         }
         catch (Exception ex)
         {

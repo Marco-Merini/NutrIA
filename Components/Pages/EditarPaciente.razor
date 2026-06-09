@@ -1,13 +1,12 @@
 @page "/pacientes/{Id:int}/editar"
 @attribute [Authorize]
 @rendermode InteractiveServer
-@using NutriFlow.Data
 @using NutriFlow.Models
-@using Microsoft.EntityFrameworkCore
-@inject ApplicationDbContext DbContext
+@using NutriFlow.Services
+@inject IPacienteService PacienteService
+@inject IAuthService AuthService
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
-@inject NutriFlow.Services.AuthService AuthService
 
 <PageTitle>Editar Paciente - NutriAI</PageTitle>
 
@@ -149,8 +148,11 @@ else
         IsLoading = true;
         try
         {
-            PacienteModel = await DbContext.Pacientes
-                .FirstOrDefaultAsync(p => p.Id == Id);
+            await AuthService.InitializeAsync();
+            if (AuthService.CurrentUser != null)
+            {
+                PacienteModel = await PacienteService.GetPacienteByIdAsync(Id, AuthService.CurrentUser.Id);
+            }
         }
         catch (Exception ex)
         {
@@ -178,9 +180,7 @@ else
         IsSaving = true;
         try
         {
-            PacienteModel.DataAtualizacao = DateTime.Now;
-            DbContext.Pacientes.Update(PacienteModel);
-            await DbContext.SaveChangesAsync();
+            await PacienteService.UpdatePacienteAsync(PacienteModel);
 
             Snackbar.Add("Paciente atualizado com sucesso!", Severity.Success);
             NavigationManager.NavigateTo($"/pacientes/{Id}");

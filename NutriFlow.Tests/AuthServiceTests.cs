@@ -1,29 +1,30 @@
 using Xunit;
 using Moq;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Configuration;
-using NutriFlow.Data;
 using NutriFlow.Models;
 using NutriFlow.Services;
+using NutriFlow.Repositories;
 using System.IdentityModel.Tokens.Jwt;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using System;
 
 namespace NutriFlow.Tests
 {
     public class AuthServiceTests
     {
-        private readonly DbContextOptions<ApplicationDbContext> _dbContextOptions;
+        private readonly Mock<IUsuarioRepository> _usuarioRepoMock;
         private readonly Mock<AuthenticationStateProvider> _authStateProviderMock;
         private readonly IConfiguration _config;
+        private readonly List<Usuario> _usersList;
 
         public AuthServiceTests()
         {
-            _dbContextOptions = new DbContextOptionsBuilder<ApplicationDbContext>()
-                .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
-                .Options;
-
+            _usuarioRepoMock = new Mock<IUsuarioRepository>();
             _authStateProviderMock = new Mock<AuthenticationStateProvider>();
+            _usersList = new List<Usuario>();
 
             var myConfiguration = new Dictionary<string, string?>
             {
@@ -36,13 +37,22 @@ namespace NutriFlow.Tests
             _config = new ConfigurationBuilder()
                 .AddInMemoryCollection(myConfiguration)
                 .Build();
+
+            _usuarioRepoMock.Setup(r => r.GetByEmailAsync(It.IsAny<string>()))
+                .ReturnsAsync((string email) => _usersList.FirstOrDefault(u => u.Email == email));
+
+            _usuarioRepoMock.Setup(r => r.AddAsync(It.IsAny<Usuario>()))
+                .Callback<Usuario>(u => _usersList.Add(u))
+                .Returns(Task.CompletedTask);
+
+            _usuarioRepoMock.Setup(r => r.ExisteUsuarioAsync(It.IsAny<string>(), It.IsAny<string>()))
+                .ReturnsAsync((string nome, string email) => _usersList.Any(u => u.Nome == nome || u.Email == email));
         }
 
         [Fact]
         public async Task LoginAsync_ValidCredentials_ReturnsTrueAndToken()
         {
             // Arrange
-            using var dbContext = new ApplicationDbContext(_dbContextOptions);
             var plainPassword = "SecurePassword123";
             var hashedPassword = BCrypt.Net.BCrypt.HashPassword(plainPassword);
 
@@ -56,10 +66,9 @@ namespace NutriFlow.Tests
                 Tipo = "Nutricionista"
             };
 
-            await dbContext.Usuarios.AddAsync(user);
-            await dbContext.SaveChangesAsync();
+            _usersList.Add(user);
 
-            var service = new AuthService(dbContext, _authStateProviderMock.Object, _config);
+            var service = new AuthService(_usuarioRepoMock.Object, _authStateProviderMock.Object, _config);
 
             // Act
             var (success, token) = await service.LoginAsync("teste@nutriflow.com", plainPassword);
@@ -78,7 +87,6 @@ namespace NutriFlow.Tests
         public async Task LoginAsync_InvalidPassword_ReturnsFalse()
         {
             // Arrange
-            using var dbContext = new ApplicationDbContext(_dbContextOptions);
             var plainPassword = "SecurePassword123";
             var hashedPassword = BCrypt.Net.BCrypt.HashPassword(plainPassword);
 
@@ -91,10 +99,9 @@ namespace NutriFlow.Tests
                 Ativo = "S"
             };
 
-            await dbContext.Usuarios.AddAsync(user);
-            await dbContext.SaveChangesAsync();
+            _usersList.Add(user);
 
-            var service = new AuthService(dbContext, _authStateProviderMock.Object, _config);
+            var service = new AuthService(_usuarioRepoMock.Object, _authStateProviderMock.Object, _config);
 
             // Act
             var (success, token) = await service.LoginAsync("teste2@nutriflow.com", "WrongPassword");
@@ -108,8 +115,7 @@ namespace NutriFlow.Tests
         public async Task RegisterAsync_NewUser_EncryptsPasswordAndSaves()
         {
             // Arrange
-            using var dbContext = new ApplicationDbContext(_dbContextOptions);
-            var service = new AuthService(dbContext, _authStateProviderMock.Object, _config);
+            var service = new AuthService(_usuarioRepoMock.Object, _authStateProviderMock.Object, _config);
             var newUser = new Usuario
             {
                 Nome = "Novo Nutri",
@@ -123,7 +129,7 @@ namespace NutriFlow.Tests
 
             // Assert
             Assert.True(success);
-            var savedUser = await dbContext.Usuarios.FirstOrDefaultAsync(u => u.Email == "novo@nutri.com");
+            var savedUser = _usersList.FirstOrDefault(u => u.Email == "novo@nutri.com");
             Assert.NotNull(savedUser);
             Assert.NotEqual("MyPlainPassword", savedUser.Senha);
             Assert.True(BCrypt.Net.BCrypt.Verify("MyPlainPassword", savedUser.Senha));
