@@ -9,6 +9,7 @@ using NutriFlow.Data;
 using NutriFlow.Models.Rag;
 using NutriFlow.Services;
 using NutriFlow.Repositories;
+using NutriFlow.Health;
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.RateLimiting;
@@ -289,7 +290,7 @@ static void ConfigurePipeline(WebApplication app)
     
     app.Use(async (context, next) =>
     {
-        context.Response.Headers.Append("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; frame-ancestors 'none';");
+        context.Response.Headers.Append("Content-Security-Policy", "default-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; script-src 'self'; frame-ancestors 'none';");
         context.Response.Headers.Append("X-Frame-Options", "DENY");
         context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
         context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
@@ -476,21 +477,24 @@ static async Task<IResult> HandleMetricasAsync(
     return Results.Ok(metricas);
 }
 
-public class DbHealthCheck : IHealthCheck
+namespace NutriFlow.Health
 {
-    private readonly ApplicationDbContext _db;
-    public DbHealthCheck(ApplicationDbContext db) => _db = db;
-    public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
+    public class DbHealthCheck : IHealthCheck
     {
-        try
+        private readonly ApplicationDbContext _db;
+        public DbHealthCheck(ApplicationDbContext db) => _db = db;
+        public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
         {
-            return await _db.Database.CanConnectAsync(cancellationToken)
-                ? HealthCheckResult.Healthy("Conectividade do Banco de Dados OK")
-                : HealthCheckResult.Unhealthy("Conectividade do Banco de Dados Falhou");
-        }
-        catch (Exception ex)
-        {
-            return HealthCheckResult.Unhealthy(ex.Message);
+            try
+            {
+                return await _db.Database.CanConnectAsync(cancellationToken)
+                    ? HealthCheckResult.Healthy("Conectividade do Banco de Dados OK")
+                    : HealthCheckResult.Unhealthy("Conectividade do Banco de Dados Falhou");
+            }
+            catch (Exception ex)
+            {
+                return HealthCheckResult.Unhealthy(ex.Message);
+            }
         }
     }
 }
