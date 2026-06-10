@@ -181,9 +181,6 @@ app.MapGet("/api/v1/version", () => Results.Ok(new {
     Framework = ".NET 8.0"
 }));
 
-// ─── Migrações Automáticas ────────────────────────────────────────────────
-await ApplyMigrationsAsync(app);
-
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
@@ -290,7 +287,7 @@ static void ConfigurePipeline(WebApplication app)
     
     app.Use(async (context, next) =>
     {
-        context.Response.Headers.Append("Content-Security-Policy", "default-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; script-src 'self'; frame-ancestors 'none';");
+        context.Response.Headers.Append("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; frame-ancestors 'none';");
         context.Response.Headers.Append("X-Frame-Options", "DENY");
         context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
         context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
@@ -328,43 +325,6 @@ static IResult HandleLogout(HttpContext httpContext)
     return Results.Redirect("/");
 }
 
-static async Task ApplyMigrationsAsync(WebApplication app)
-{
-    using var scope = app.Services.CreateScope();
-    var services = scope.ServiceProvider;
-    var logger = services.GetRequiredService<ILogger<Program>>();
-    var db = services.GetRequiredService<ApplicationDbContext>();
-    
-    for (int i = 1; i <= 12; i++)
-    {
-        try
-        {
-            logger.LogInformation("Aplicando migrações do banco de dados (Tentativa {Tentativa}/12)...", i);
-            await db.Database.MigrateAsync();
-            logger.LogInformation("Banco de dados pronto e migrações aplicadas com sucesso!");
-            break;
-        }
-        catch (Exception ex)
-        {
-            if (ex.Message.Contains("Já existe um objeto com nome") || 
-                ex.Message.Contains("already exists") || 
-                ex.Message.Contains("there is already an object"))
-            {
-                logger.LogWarning("O banco de dados já possui a estrutura de tabelas criada. Ignorando migração inicial.");
-                break;
-            }
-
-            logger.LogWarning("SQL Server não está pronto: {Message}. Aguardando 5 segundos...", ex.Message);
-            if (i == 12)
-            {
-                logger.LogError(ex, "Falha de conexão com o banco após 12 tentativas.");
-                throw;
-            }
-            await Task.Delay(5000);
-        }
-    }
-}
-
 static async Task<IResult> HandleLoginAsync(
     HttpContext httpContext,
     string email,
@@ -379,7 +339,7 @@ static async Task<IResult> HandleLoginAsync(
         httpContext.Response.Cookies.Append("NutriAI.AuthToken", token, new CookieOptions
         {
             HttpOnly = true,
-            Secure = true,
+            Secure = httpContext.Request.IsHttps,
             SameSite = SameSiteMode.Strict,
             Expires = DateTimeOffset.UtcNow.AddHours(expireHours)
         });

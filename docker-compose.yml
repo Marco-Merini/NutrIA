@@ -17,6 +17,7 @@ services:
       - RAG__MaxTokensResposta=2000
       - RAG__ChunkBatchSize=50
       - ASPNETCORE_ENVIRONMENT=Production
+      - DOTNET_RUNNING_IN_CONTAINER=true
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: always
