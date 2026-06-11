@@ -48,7 +48,7 @@ else
     </div>
 
     <!-- Chart Area -->
-    @if (ProgressosFiltrados.Any())
+    @if (GetProgressosFiltrados().Any())
     {
         <MudPaper Class="nutri-card pa-6 mb-6" Elevation="0">
             <MudText Typo="Typo.subtitle1" Class="font-bold mb-4">Evolução do Peso</MudText>
@@ -58,7 +58,7 @@ else
     }
 
     <!-- Progress List -->
-    @if (!ProgressosFiltrados.Any())
+    @if (!GetProgressosFiltrados().Any())
     {
         <MudPaper Class="pa-8 text-center" Elevation="0" Style="border: 1px solid #f1f5f9; border-radius: 12px;">
             <MudIcon Icon="@Icons.Material.Outlined.TrendingUp" Size="Size.Large" Style="color: #cbd5e1;" />
@@ -69,7 +69,7 @@ else
     else
     {
         <div class="d-flex flex-column gap-4">
-            @foreach (var p in ProgressosFiltrados)
+            @foreach (var p in GetProgressosFiltrados())
             {
                 <MudPaper Class="nutri-card pa-4 d-flex justify-space-between align-start" Elevation="0">
                     <div class="d-flex gap-4">
@@ -139,11 +139,17 @@ else
     private List<NutriFlow.Models.Paciente> pacientes = new();
     private List<NutriFlow.Models.Progresso> progressos = new();
 
-    private List<NutriFlow.Models.Progresso> ProgressosFiltrados => filtroSelecionado == null
-        ? progressos
-        : progressos.Where(p => p.PacienteId == filtroSelecionado).ToList();
+    private List<NutriFlow.Models.Progresso> GetProgressosFiltrados()
+    {
+        if (filtroSelecionado == null)
+            return progressos;
 
-    public ChartOptions Options = new ChartOptions()
+        return progressos
+            .Where(p => p.PacienteId == filtroSelecionado)
+            .ToList();
+    }
+
+    private ChartOptions Options { get; set; } = new()
     {
         LineStrokeWidth = 3,
         MaxNumYAxisTicks = 5,
@@ -208,7 +214,7 @@ else
 
     private void AtualizarGrafico()
     {
-        var dados = ProgressosFiltrados
+        var dados = GetProgressosFiltrados()
             .Where(p => p.Peso != null && p.DataRegistro != null)
             .OrderBy(p => p.DataRegistro)
             .ToList();

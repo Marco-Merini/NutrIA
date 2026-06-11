@@ -80,7 +80,13 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("SecurePolicy", policy =>
     {
-        policy.WithOrigins("http://localhost:8080", "https://localhost:8080")
+        policy.WithOrigins(
+                  "http://localhost:5028",
+                  "https://localhost:7276",
+                  "http://localhost:8080",
+                  "https://localhost:8080",
+                  "https://dietanutriai.online",
+                  "https://www.dietanutriai.online")
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
@@ -287,7 +293,21 @@ static void ConfigurePipeline(WebApplication app)
     
     app.Use(async (context, next) =>
     {
-        context.Response.Headers.Append("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; frame-ancestors 'none';");
+        context.Response.Headers.Append(
+            "Content-Security-Policy",
+            "default-src 'self'; " +
+            "base-uri 'self'; " +
+            "object-src 'none'; " +
+            "script-src 'self'; " +
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+            "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+            "style-src-attr 'unsafe-inline'; " +
+            "font-src 'self' https://fonts.gstatic.com; " +
+            "img-src 'self' data:; " +
+            "connect-src 'self' ws: wss: http://localhost:* https://localhost:* https://dietanutriai.online https://www.dietanutriai.online; " +
+            "form-action 'self'; " +
+            "frame-ancestors 'none'; " +
+            "upgrade-insecure-requests;");
         context.Response.Headers.Append("X-Frame-Options", "DENY");
         context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
         context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
