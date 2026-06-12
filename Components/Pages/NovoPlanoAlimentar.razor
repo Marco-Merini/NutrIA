@@ -1,15 +1,15 @@
 @page "/planos/novo"
 @attribute [Authorize]
 @rendermode InteractiveServer
-@using NutriFlow.Data
 @using NutriFlow.Models
-@using Microsoft.EntityFrameworkCore
-@inject ApplicationDbContext DbContext
+@using NutriFlow.Services
+@inject IPacienteService PacienteService
+@inject IPlanoDietaService PlanoDietaService
+@inject IAuthService AuthService
+@inject AIService AIService
+@inject IndexacaoBackgroundService IndexacaoBackground
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
-@inject NutriFlow.Services.AuthService AuthService
-@inject NutriFlow.Services.AIService AIService
-@inject NutriFlow.Services.IndexacaoBackgroundService IndexacaoBackground
 
 <PageTitle>Novo Plano Alimentar - NutriAI</PageTitle>
 
@@ -194,10 +194,7 @@
             await AuthService.InitializeAsync();
 
 
-            Pacientes = await DbContext.Pacientes
-                .Where(p => p.UsuarioId == AuthService.CurrentUser!.Id)
-                .OrderBy(p => p.Nome)
-                .ToListAsync();
+            Pacientes = await PacienteService.GetPacientesByUsuarioIdAsync(AuthService.CurrentUser!.Id);
 
             StateHasChanged();
         }
@@ -224,7 +221,6 @@
         IsSaving = true;
         try
         {
-            // 1. Salvar o plano primeiro para obter o ID
             var plano = new PlanoDieta
             {
                 PacienteId = PlanoModel.PacienteId,
@@ -237,36 +233,20 @@
                 Orientacoes = PlanoModel.Orientacoes,
                 ObservacoesNutricionista = PlanoModel.ObservacoesNutricionista,
                 Status = PlanoModel.Status ?? "ativo",
-                GeradoPorIa = false,
-                DataCriacao = DateTime.Now
+                GeradoPorIa = false
             };
 
-            DbContext.PlanosDieta.Add(plano);
-            await DbContext.SaveChangesAsync();
-
-            // 2. Salvar as refeições vinculadas ao plano criado
-            var refeicoes = RefeicoesList
+            plano.Refeicoes = RefeicoesList
                 .Where(r => !string.IsNullOrWhiteSpace(r.Nome))
-                .Select(rf =>
+                .Select(rf => new Refeicao
                 {
-                    var refeicao = new Refeicao
-                    {
-                        PlanoId = plano.Id,
-                        Nome = rf.Nome,
-                        Horario = rf.HorarioTexto,
-                        Alimentos = rf.Alimentos,
-                        Calorias = rf.Calorias,
-                        DataCriacao = DateTime.Now
-                    };
-
-                    return refeicao;
+                    Nome = rf.Nome,
+                    Horario = rf.HorarioTexto,
+                    Alimentos = rf.Alimentos,
+                    Calorias = rf.Calorias
                 }).ToList();
 
-            if (refeicoes.Any())
-            {
-                DbContext.Refeicoes.AddRange(refeicoes);
-                await DbContext.SaveChangesAsync();
-            }
+            await PlanoDietaService.AddPlanoDietaAsync(plano);
 
             if (plano.PacienteId.HasValue)
             {

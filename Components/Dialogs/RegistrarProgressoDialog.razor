@@ -1,9 +1,9 @@
-@using NutriFlow.Data
 @using NutriFlow.Models
-@using Microsoft.EntityFrameworkCore
-@inject ApplicationDbContext DbContext
+@using NutriFlow.Services
+@inject IProgressoService ProgressoService
+@inject IPacienteService PacienteService
+@inject IAuthService AuthService
 @inject ISnackbar Snackbar
-@inject NutriFlow.Services.AuthService AuthService
 
 <MudDialog>
     <TitleContent>
@@ -122,10 +122,7 @@
         await AuthService.InitializeAsync();
         if (AuthService.CurrentUser != null)
         {
-            Pacientes = await DbContext.Pacientes
-                .Where(p => p.UsuarioId == AuthService.CurrentUser.Id)
-                .OrderBy(p => p.Nome)
-                .ToListAsync();
+            Pacientes = await PacienteService.GetPacientesByUsuarioIdAsync(AuthService.CurrentUser.Id);
         }
     }
 
@@ -138,11 +135,7 @@
         try
         {
             ProgressoModel.DataRegistro = DataRegistro;
-            ProgressoModel.DataCriacao = DateTime.Now;
-            ProgressoModel.DataAtualizacao = DateTime.Now;
-
-            DbContext.Progressos.Add(ProgressoModel);
-            await DbContext.SaveChangesAsync();
+            await ProgressoService.AddProgressoAsync(ProgressoModel);
 
             Snackbar.Add("Progresso registrado com sucesso!", Severity.Success);
             MudDialog.Close(DialogResult.Ok(true));

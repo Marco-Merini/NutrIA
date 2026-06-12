@@ -8,12 +8,25 @@ using NutriFlow.Components;
 using NutriFlow.Data;
 using NutriFlow.Models.Rag;
 using NutriFlow.Services;
+using NutriFlow.Repositories;
+using NutriFlow.Health;
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.OpenApi.Models;
+using Serilog;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// ─── Observabilidade (Serilog) ─────────────────────────────────────────────
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    .WriteTo.Console()
+    .WriteTo.File("Logs/log-.txt", rollingInterval: RollingInterval.Day)
+    .CreateLogger();
+
+builder.Host.UseSerilog();
 
 // ─── Blazor ───────────────────────────────────────────────────────────────
 builder.Services.AddRazorComponents()
@@ -37,11 +50,48 @@ var connectionString = GetConnectionString(builder.Configuration);
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(connectionString));
 
-// ─── Serviços de Aplicação ────────────────────────────────────────────────
+// ─── Camada de Repositório (Repository Layer) ─────────────────────────────
+builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+builder.Services.AddScoped<IPacienteRepository, PacienteRepository>();
+builder.Services.AddScoped<ISessaoRepository, SessaoRepository>();
+builder.Services.AddScoped<IProgressoRepository, ProgressoRepository>();
+builder.Services.AddScoped<IPlanoDietaRepository, PlanoDietaRepository>();
+builder.Services.AddScoped<IUsuarioRepository, UsuarioRepository>();
+builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
+builder.Services.AddScoped<IEmbeddingChunkRepository, EmbeddingChunkRepository>();
+
+// ─── Camada de Serviços (Service Layer) ───────────────────────────────────
 builder.Services.AddScoped<AuthService>();
-builder.Services.AddScoped<NavigationService>();
+builder.Services.AddScoped<IAuthService>(sp => sp.GetRequiredService<AuthService>());
 builder.Services.AddScoped<AuditoriaService>();
+builder.Services.AddScoped<IAuditoriaService>(sp => sp.GetRequiredService<AuditoriaService>());
+builder.Services.AddScoped<NavigationService>();
 builder.Services.AddScoped<IPacienteService, PacienteService>();
+builder.Services.AddScoped<ISessaoService, SessaoService>();
+builder.Services.AddScoped<IProgressoService, ProgressoService>();
+builder.Services.AddScoped<IPlanoDietaService, PlanoDietaService>();
+
+// ─── Observabilidade (Health Checks) ───────────────────────────────────────
+builder.Services.AddHealthChecks()
+    .AddCheck<DbHealthCheck>("Database");
+
+// ─── Segurança (CORS) ─────────────────────────────────────────────────────
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("SecurePolicy", policy =>
+    {
+        policy.WithOrigins(
+                  "http://localhost:5028",
+                  "https://localhost:7276",
+                  "http://localhost:8080",
+                  "https://localhost:8080",
+                  "https://dietanutriai.online",
+                  "https://www.dietanutriai.online")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
 
 // AIService como Singleton: mantém índice em memória entre requests
 var openaiApiKey = GetOpenAiApiKey(builder.Configuration);
@@ -102,7 +152,7 @@ app.MapPost("/api/v1/auth/login", async (
     HttpContext httpContext,
     [Microsoft.AspNetCore.Mvc.FromForm] string email,
     [Microsoft.AspNetCore.Mvc.FromForm] string senha,
-    AuthService authService) => await HandleLoginAsync(httpContext, email, senha, authService, expireHours)).DisableAntiforgery();
+    IAuthService authService) => await HandleLoginAsync(httpContext, email, senha, authService, expireHours)).DisableAntiforgery();
 
 app.MapGet("/api/v1/auth/logout", (HttpContext httpContext) => HandleLogout(httpContext));
 
@@ -111,24 +161,31 @@ app.MapPost("/api/v1/assistente/query", async (
     HttpContext httpContext,
     AssistenteQuery request,
     AIService aiService,
-    AuditoriaService auditoriaService,
-    ApplicationDbContext db) => await HandleQueryAsync(httpContext, request, aiService, auditoriaService, db))
+    IAuditoriaService auditoriaService,
+    IPacienteService pacienteService) => await HandleQueryAsync(httpContext, request, aiService, auditoriaService, pacienteService))
 .RequireAuthorization().DisableAntiforgery().RequireRateLimiting("ia-policy");
 
 app.MapGet("/api/v1/assistente/audit/{pacienteId:int}", async (
     int pacienteId,
     HttpContext httpContext,
-    AuditoriaService auditoriaService,
-    ApplicationDbContext db) => await HandleAuditAsync(pacienteId, httpContext, auditoriaService, db))
+    IAuditoriaService auditoriaService,
+    IPacienteService pacienteService) => await HandleAuditAsync(pacienteId, httpContext, auditoriaService, pacienteService))
 .RequireAuthorization();
 
 app.MapGet("/api/v1/assistente/metricas", async (
     HttpContext httpContext,
-    AuditoriaService auditoriaService) => await HandleMetricasAsync(httpContext, auditoriaService))
+    IAuditoriaService auditoriaService) => await HandleMetricasAsync(httpContext, auditoriaService))
 .RequireAuthorization();
 
-// ─── Migrações Automáticas ────────────────────────────────────────────────
-await ApplyMigrationsAsync(app);
+// ─── Endpoints de Versionamento e Observabilidade ──────────────────────────
+app.MapHealthChecks("/health");
+
+app.MapGet("/api/v1/version", () => Results.Ok(new {
+    Version = "1.1.0",
+    Status = "Active",
+    Environment = app.Environment.EnvironmentName,
+    Framework = ".NET 8.0"
+}));
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
@@ -232,6 +289,32 @@ static void ConfigureSwagger(Swashbuckle.AspNetCore.SwaggerGen.SwaggerGenOptions
 
 static void ConfigurePipeline(WebApplication app)
 {
+    app.UseCors("SecurePolicy");
+    
+    app.Use(async (context, next) =>
+    {
+        context.Response.Headers.Append(
+            "Content-Security-Policy",
+            "default-src 'self'; " +
+            "base-uri 'self'; " +
+            "object-src 'none'; " +
+            "script-src 'self'; " +
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+            "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+            "style-src-attr 'unsafe-inline'; " +
+            "font-src 'self' https://fonts.gstatic.com; " +
+            "img-src 'self' data:; " +
+            "connect-src 'self' ws: wss: http://localhost:* https://localhost:* https://dietanutriai.online https://www.dietanutriai.online; " +
+            "form-action 'self'; " +
+            "frame-ancestors 'none'; " +
+            "upgrade-insecure-requests;");
+        context.Response.Headers.Append("X-Frame-Options", "DENY");
+        context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
+        context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
+        context.Response.Headers.Append("X-XSS-Protection", "1; mode=block");
+        await next();
+    });
+
     if (!app.Environment.IsDevelopment())
     {
         app.UseExceptionHandler("/Error", createScopeForErrors: true);
@@ -262,48 +345,11 @@ static IResult HandleLogout(HttpContext httpContext)
     return Results.Redirect("/");
 }
 
-static async Task ApplyMigrationsAsync(WebApplication app)
-{
-    using var scope = app.Services.CreateScope();
-    var services = scope.ServiceProvider;
-    var logger = services.GetRequiredService<ILogger<Program>>();
-    var db = services.GetRequiredService<ApplicationDbContext>();
-    
-    for (int i = 1; i <= 12; i++)
-    {
-        try
-        {
-            logger.LogInformation("Aplicando migrações do banco de dados (Tentativa {Tentativa}/12)...", i);
-            await db.Database.MigrateAsync();
-            logger.LogInformation("Banco de dados pronto e migrações aplicadas com sucesso!");
-            break;
-        }
-        catch (Exception ex)
-        {
-            if (ex.Message.Contains("Já existe um objeto com nome") || 
-                ex.Message.Contains("already exists") || 
-                ex.Message.Contains("there is already an object"))
-            {
-                logger.LogWarning("O banco de dados já possui a estrutura de tabelas criada. Ignorando migração inicial.");
-                break;
-            }
-
-            logger.LogWarning("SQL Server não está pronto: {Message}. Aguardando 5 segundos...", ex.Message);
-            if (i == 12)
-            {
-                logger.LogError(ex, "Falha de conexão com o banco após 12 tentativas.");
-                throw;
-            }
-            await Task.Delay(5000);
-        }
-    }
-}
-
 static async Task<IResult> HandleLoginAsync(
     HttpContext httpContext,
     string email,
     string senha,
-    AuthService authService,
+    IAuthService authService,
     int expireHours)
 {
     var (success, token) = await authService.LoginAsync(email, senha);
@@ -313,7 +359,7 @@ static async Task<IResult> HandleLoginAsync(
         httpContext.Response.Cookies.Append("NutriAI.AuthToken", token, new CookieOptions
         {
             HttpOnly = true,
-            Secure = true,
+            Secure = httpContext.Request.IsHttps,
             SameSite = SameSiteMode.Strict,
             Expires = DateTimeOffset.UtcNow.AddHours(expireHours)
         });
@@ -327,8 +373,8 @@ static async Task<IResult> HandleQueryAsync(
     HttpContext httpContext,
     AssistenteQuery request,
     AIService aiService,
-    AuditoriaService auditoriaService,
-    ApplicationDbContext db)
+    IAuditoriaService auditoriaService,
+    IPacienteService pacienteService)
 {
     if (!httpContext.User.Identity?.IsAuthenticated ?? true)
         return Results.Unauthorized();
@@ -340,13 +386,7 @@ static async Task<IResult> HandleQueryAsync(
     if (!request.ConsentimentoLGPD)
         return Results.BadRequest(new { error = "Consentimento LGPD obrigatório para consultas à IA." });
 
-    var paciente = await db.Pacientes
-        .AsNoTracking()
-        .Include(p => p.Sessoes)
-        .Include(p => p.Progressos)
-        .Include(p => p.PlanosDieta)
-            .ThenInclude(pd => pd.Refeicoes)
-        .FirstOrDefaultAsync(p => p.Id == request.PacienteId && p.UsuarioId == userId);
+    var paciente = await pacienteService.GetPacienteByIdAsync(request.PacienteId, userId);
 
     if (paciente == null)
         return Results.Forbid();
@@ -384,8 +424,8 @@ static async Task<IResult> HandleQueryAsync(
 static async Task<IResult> HandleAuditAsync(
     int pacienteId,
     HttpContext httpContext,
-    AuditoriaService auditoriaService,
-    ApplicationDbContext db)
+    IAuditoriaService auditoriaService,
+    IPacienteService pacienteService)
 {
     if (!httpContext.User.Identity?.IsAuthenticated ?? true)
         return Results.Unauthorized();
@@ -394,10 +434,9 @@ static async Task<IResult> HandleAuditAsync(
     if (!int.TryParse(userIdClaim, out int userId))
         return Results.Unauthorized();
 
-    var pacienteExiste = await db.Pacientes
-        .AnyAsync(p => p.Id == pacienteId && p.UsuarioId == userId);
+    var paciente = await pacienteService.GetPacienteByIdAsync(pacienteId, userId);
 
-    if (!pacienteExiste)
+    if (paciente == null)
         return Results.Forbid();
 
     var logs = await auditoriaService.GetLogsPorPacienteAsync(pacienteId, userId.ToString());
@@ -406,7 +445,7 @@ static async Task<IResult> HandleAuditAsync(
 
 static async Task<IResult> HandleMetricasAsync(
     HttpContext httpContext,
-    AuditoriaService auditoriaService)
+    IAuditoriaService auditoriaService)
 {
     if (!httpContext.User.Identity?.IsAuthenticated ?? true)
         return Results.Unauthorized();
@@ -416,4 +455,26 @@ static async Task<IResult> HandleMetricasAsync(
 
     var metricas = await auditoriaService.GetMetricasAsync(userIdClaim);
     return Results.Ok(metricas);
+}
+
+namespace NutriFlow.Health
+{
+    public class DbHealthCheck : IHealthCheck
+    {
+        private readonly ApplicationDbContext _db;
+        public DbHealthCheck(ApplicationDbContext db) => _db = db;
+        public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                return await _db.Database.CanConnectAsync(cancellationToken)
+                    ? HealthCheckResult.Healthy("Conectividade do Banco de Dados OK")
+                    : HealthCheckResult.Unhealthy("Conectividade do Banco de Dados Falhou");
+            }
+            catch (Exception ex)
+            {
+                return HealthCheckResult.Unhealthy(ex.Message);
+            }
+        }
+    }
 }

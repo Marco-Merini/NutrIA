@@ -1,6 +1,7 @@
 using System.Threading.Channels;
 using NutriFlow.Data;
 using NutriFlow.Services;
+using NutriFlow.Repositories;
 using Microsoft.EntityFrameworkCore;
 
 namespace NutriFlow.Services
@@ -95,17 +96,11 @@ namespace NutriFlow.Services
                 request.PacienteId, request.Motivo);
 
             using var scope = _scopeFactory.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var pacienteRepo = scope.ServiceProvider.GetRequiredService<IPacienteRepository>();
             var aiService = scope.ServiceProvider.GetRequiredService<AIService>();
 
             // Carrega paciente com todas as relações necessárias
-            var paciente = await db.Pacientes
-                .AsNoTracking()
-                .Include(p => p.Sessoes)
-                .Include(p => p.Progressos)
-                .Include(p => p.PlanosDieta)
-                    .ThenInclude(pd => pd.Refeicoes)
-                .FirstOrDefaultAsync(p => p.Id == request.PacienteId, ct);
+            var paciente = await pacienteRepo.GetPacienteCompletoSemUsuarioAsync(request.PacienteId);
 
             if (paciente == null)
             {

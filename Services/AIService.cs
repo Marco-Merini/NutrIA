@@ -6,6 +6,7 @@ using FaissMask;
 using NutriFlow.Models;
 using NutriFlow.Models.Rag;
 using NutriFlow.Data;
+using NutriFlow.Repositories;
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
@@ -104,12 +105,9 @@ namespace NutriFlow.Services
         public async Task<bool> LoadIndexFromDbAsync(int pacienteId)
         {
             using var scope = _scopeFactory.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var embeddingRepo = scope.ServiceProvider.GetRequiredService<IEmbeddingChunkRepository>();
 
-            var storedChunks = await db.Embeddings
-                .AsNoTracking()
-                .Where(e => e.PatientId == pacienteId)
-                .ToListAsync();
+            var storedChunks = await embeddingRepo.GetChunksByPacienteIdAsync(pacienteId);
 
             if (!storedChunks.Any()) return false;
 
@@ -197,11 +195,10 @@ namespace NutriFlow.Services
             try
             {
                 using var scope = _scopeFactory.CreateScope();
-                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                var embeddingRepo = scope.ServiceProvider.GetRequiredService<IEmbeddingChunkRepository>();
 
                 // Remove embeddings antigos do paciente
-                var old = await db.Embeddings.Where(e => e.PatientId == pacienteId).ToListAsync();
-                db.Embeddings.RemoveRange(old);
+                await embeddingRepo.DeleteChunksByPacienteIdAsync(pacienteId);
 
                 // Insere novos
                 var entities = chunks.Select(c => new EmbeddingChunk
@@ -216,8 +213,11 @@ namespace NutriFlow.Services
                     CreatedAt = DateTime.UtcNow
                 }).ToList();
 
-                db.Embeddings.AddRange(entities);
-                await db.SaveChangesAsync();
+                foreach (var entity in entities)
+                {
+                    await embeddingRepo.AddAsync(entity);
+                }
+                await embeddingRepo.SaveChangesAsync();
 
                 Console.WriteLine($"[AIService] {chunks.Count} embeddings do paciente {pacienteId} persistidos no banco.");
             }

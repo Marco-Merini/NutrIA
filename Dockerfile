@@ -9,8 +9,8 @@ RUN dotnet restore "NutriFlow.csproj"
 # Copiar apenas os arquivos de código e recursos necessários para compilação (evitando COPY . .)
 COPY Components/ ./Components/
 COPY Data/ ./Data/
-COPY Migrations/ ./Migrations/
 COPY Models/ ./Models/
+COPY Repositories/ ./Repositories/
 COPY Services/ ./Services/
 COPY Properties/ ./Properties/
 COPY wwwroot/ ./wwwroot/

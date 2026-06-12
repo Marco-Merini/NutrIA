@@ -1,29 +1,26 @@
-using NutriFlow.Data;
 using NutriFlow.Models;
 using NutriFlow.Models.Rag;
-using Microsoft.EntityFrameworkCore;
+using NutriFlow.Repositories;
+using Microsoft.Extensions.Logging;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
+using System.Threading.Tasks;
 
 namespace NutriFlow.Services
 {
-    /// <summary>
-    /// Serviço scoped responsável por persistir e consultar logs de auditoria de consultas à IA.
-    /// Cada chamada ao endpoint /api/assistente/query gera um registro auditável.
-    /// </summary>
-    public class AuditoriaService
+    public class AuditoriaService : IAuditoriaService
     {
-        private readonly ApplicationDbContext _db;
+        private readonly IAuditLogRepository _auditLogRepository;
         private readonly ILogger<AuditoriaService> _logger;
 
-        public AuditoriaService(ApplicationDbContext db, ILogger<AuditoriaService> logger)
+        public AuditoriaService(IAuditLogRepository auditLogRepository, ILogger<AuditoriaService> logger)
         {
-            _db = db;
+            _auditLogRepository = auditLogRepository;
             _logger = logger;
         }
 
-        /// <summary>
-        /// Persiste um log de auditoria de uma consulta RAG.
-        /// </summary>
         public async Task LogConsultaAsync(
             string userId,
             int? pacienteId,
@@ -44,7 +41,6 @@ namespace NutriFlow.Services
                     PatientId = pacienteId,
                     Endpoint = endpoint,
                     QueryText = query,
-                    // Salvar apenas os primeiros 500 caracteres da resposta
                     ResponseSummary = response.Answer.Length > 500
                         ? response.Answer[..500] + "…"
                         : response.Answer,
@@ -56,8 +52,8 @@ namespace NutriFlow.Services
                     Timestamp = DateTime.UtcNow
                 };
 
-                _db.AuditLogs.Add(log);
-                await _db.SaveChangesAsync();
+                await _auditLogRepository.AddAsync(log);
+                await _auditLogRepository.SaveChangesAsync();
 
                 _logger.LogInformation(
                     "[Auditoria] UserId={UserId} PacienteId={PacienteId} Query={Query} Chunks={Chunks} Latencia={Latencia}ms",
@@ -65,69 +61,59 @@ namespace NutriFlow.Services
             }
             catch (Exception ex)
             {
-                // Log sem interromper o fluxo principal
                 _logger.LogError(ex, "[Auditoria] Falha ao persistir log de auditoria para userId={UserId}", userId);
             }
         }
 
-        /// <summary>
-        /// Retorna logs de auditoria de um paciente, ordenados por data decrescente.
-        /// Restringe ao userId para garantir que o nutricionista só veja seus próprios logs.
-        /// </summary>
         public async Task<List<AuditLog>> GetLogsPorPacienteAsync(int pacienteId, string userId, int limit = 50)
         {
-            return await _db.AuditLogs
-                .AsNoTracking()
-                .Where(l => l.PatientId == pacienteId && l.UserId == userId)
-                .OrderByDescending(l => l.Timestamp)
-                .Take(limit)
-                .ToListAsync();
+            try
+            {
+                return await _auditLogRepository.GetLogsPorPacienteAsync(pacienteId, userId, limit);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao buscar logs de auditoria por paciente {PacienteId}", pacienteId);
+                return new List<AuditLog>();
+            }
         }
 
-        /// <summary>
-        /// Retorna todos os logs de auditoria do usuário (nutricionista).
-        /// </summary>
         public async Task<List<AuditLog>> GetLogsPorUsuarioAsync(string userId, int limit = 100)
         {
-            return await _db.AuditLogs
-                .AsNoTracking()
-                .Where(l => l.UserId == userId)
-                .OrderByDescending(l => l.Timestamp)
-                .Take(limit)
-                .ToListAsync();
+            try
+            {
+                return await _auditLogRepository.GetLogsPorUsuarioAsync(userId, limit);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao buscar logs de auditoria por usuário {UserId}", userId);
+                return new List<AuditLog>();
+            }
         }
 
-        /// <summary>
-        /// Métricas agregadas: latência média, total de consultas e chunks médios por consulta.
-        /// </summary>
         public async Task<AuditoriaMetricas> GetMetricasAsync(string userId)
         {
-            var logs = await _db.AuditLogs
-                .AsNoTracking()
-                .Where(l => l.UserId == userId)
-                .ToListAsync();
-
-            if (!logs.Any())
-                return new AuditoriaMetricas();
-
-            return new AuditoriaMetricas
+            try
             {
-                TotalConsultas = logs.Count,
-                LatenciaMediaMs = (int)logs.Average(l => l.LatenciaMs),
-                ChunksMediosPorConsulta = logs.Average(l => l.ChunksRetrieved),
-                ConsultasHoje = logs.Count(l => l.Timestamp.Date == DateTime.UtcNow.Date),
-                UltimaConsulta = logs.Max(l => l.Timestamp)
-            };
-        }
-    }
+                var logs = await _auditLogRepository.GetTodosLogsPorUsuarioAsync(userId);
 
-    /// <summary>Métricas agregadas de auditoria.</summary>
-    public class AuditoriaMetricas
-    {
-        public int TotalConsultas { get; set; }
-        public int LatenciaMediaMs { get; set; }
-        public double ChunksMediosPorConsulta { get; set; }
-        public int ConsultasHoje { get; set; }
-        public DateTime? UltimaConsulta { get; set; }
+                if (!logs.Any())
+                    return new AuditoriaMetricas();
+
+                return new AuditoriaMetricas
+                {
+                    TotalConsultas = logs.Count,
+                    LatenciaMediaMs = (int)logs.Average(l => l.LatenciaMs),
+                    ChunksMediosPorConsulta = logs.Average(l => l.ChunksRetrieved),
+                    ConsultasHoje = logs.Count(l => l.Timestamp.Date == DateTime.UtcNow.Date),
+                    UltimaConsulta = logs.Max(l => l.Timestamp)
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao calcular métricas de auditoria para o usuário {UserId}", userId);
+                return new AuditoriaMetricas();
+            }
+        }
     }
 }

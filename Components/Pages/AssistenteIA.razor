@@ -2,11 +2,10 @@
 @attribute [Authorize]
 @rendermode InteractiveServer
 @inject ISnackbar Snackbar
-@inject NutriFlow.Data.ApplicationDbContext DbContext
 @inject NutriFlow.Services.AIService AIService
-@inject NutriFlow.Services.AuthService AuthService
+@inject NutriFlow.Services.IAuthService AuthService
 @inject NutriFlow.Services.IndexacaoBackgroundService IndexacaoBackground
-@using Microsoft.EntityFrameworkCore
+@inject NutriFlow.Services.IPacienteService PacienteService
 @using NutriFlow.Models
 @using NutriFlow.Models.Rag
 @using System.Text.RegularExpressions
@@ -249,15 +248,7 @@
 
             if (userId != null)
             {
-                pacientes = await DbContext.Pacientes
-                    .AsNoTracking()
-                    .Where(p => p.UsuarioId == userId)
-                    .Include(p => p.Sessoes)
-                    .Include(p => p.Progressos)
-                    .Include(p => p.PlanosDieta)
-                        .ThenInclude(pd => pd.Refeicoes)
-                    .OrderBy(p => p.Nome)
-                    .ToListAsync();
+                pacientes = await PacienteService.GetPacientesByUsuarioIdAsync(userId.Value);
             }
 
             chatMessages.Add(new ChatMsg
@@ -283,13 +274,9 @@
         try
         {
             // Carrega o paciente atualizado do banco com todos os dados e relacionamentos para o RAG
-            var paciente = await DbContext.Pacientes
-                .AsNoTracking()
-                .Include(p => p.Sessoes)
-                .Include(p => p.Progressos)
-                .Include(p => p.PlanosDieta)
-                    .ThenInclude(pd => pd.Refeicoes)
-                .FirstOrDefaultAsync(p => p.Id == selectedPacienteId);
+            var userId = AuthService.CurrentUser?.Id;
+            if (userId == null) return;
+            var paciente = await PacienteService.GetPacienteByIdAsync(selectedPacienteId, userId.Value);
 
             if (paciente == null) { Snackbar.Add("Paciente não encontrado.", Severity.Error); return; }
 

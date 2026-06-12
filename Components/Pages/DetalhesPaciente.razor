@@ -1,9 +1,9 @@
 @page "/pacientes/{Id:int}"
 @rendermode InteractiveServer
-@using NutriFlow.Data
 @using NutriFlow.Models
-@using Microsoft.EntityFrameworkCore
-@inject ApplicationDbContext DbContext
+@using NutriFlow.Services
+@inject IPacienteService PacienteService
+@inject IAuthService AuthService
 @inject NavigationManager NavigationManager
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
@@ -220,10 +220,11 @@ else
         IsLoading = true;
         try 
         {
-            Paciente = await DbContext.Pacientes
-                .Include(p => p.PlanosDieta)
-                .Include(p => p.Progressos)
-                .FirstOrDefaultAsync(p => p.Id == Id);
+            await AuthService.InitializeAsync();
+            if (AuthService.CurrentUser != null)
+            {
+                Paciente = await PacienteService.GetPacienteByIdAsync(Id, AuthService.CurrentUser.Id);
+            }
         }
         catch (Exception ex)
         {
