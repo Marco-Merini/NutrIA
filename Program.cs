@@ -147,6 +147,22 @@ var app = builder.Build();
 // ─── Pipeline HTTP ─────────────────────────────────────────────────────────
 ConfigurePipeline(app);
 
+// ─── Database Migration ───────────────────────────────────────────────────
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    try
+    {
+        await db.Database.MigrateAsync();
+        Log.Information("Database migration completed successfully");
+    }
+    catch (Exception ex)
+    {
+        Log.Error(ex, "An error occurred during database migration");
+        throw;
+    }
+}
+
 // ─── Endpoints de Autenticação ────────────────────────────────────────────
 app.MapPost("/api/v1/auth/login", async (
     HttpContext httpContext,
