@@ -151,7 +151,7 @@ jobs:
           script: |
             set -e
             # Vai para o diretório da aplicação
-            cd /opt/nutria
+            cd /home/ubuntu/NutrIA
             # Atualiza o repositório (descarta alterações locais em arquivos rastreados)
             git reset --hard HEAD
             git pull origin main
