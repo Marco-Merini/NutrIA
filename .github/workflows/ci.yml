@@ -195,8 +195,9 @@ jobs:
             docker pull marcomerini/nutri-app:latest
             
             # Derruba o container e sobe novamente forçando recriação sem variáveis dinâmicas
-            docker compose down
-            docker compose up -d --force-recreate
+            docker compose down -v || true
+            docker rm -f nutri-app || true
+            docker compose up -d
             
             # Remove imagens antigas para liberar espaço
             docker image prune -f
