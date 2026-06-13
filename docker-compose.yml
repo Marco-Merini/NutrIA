@@ -1,9 +1,6 @@
 services:
   nutri-app:
-    image: nutri-app:latest
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: marcomerini/nutri-app:latest
     container_name: nutri-app
     ports:
       - "8080:8080"
