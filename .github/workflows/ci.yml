@@ -155,15 +155,18 @@ jobs:
             # Atualiza o repositório (descarta alterações locais em arquivos rastreados)
             git reset --hard HEAD
             git pull origin main
-            # Atualiza variável da tag da imagem
-            export TAG=${{ needs.build-and-push.outputs.image-tag }}
+            
             export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             # Faz login no Docker Hub (necessário para pull de imagens privadas)
             echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
-            # Puxa a nova imagem
-            docker pull ${DOCKERHUB_USERNAME}/nutri-app:${TAG}
-            # Reinicia os serviços com o docker-compose
-            TAG=${TAG} docker compose up -d --no-build
+            
+            # Puxa a nova imagem usando latest (para corresponder ao docker-compose.yml fixo)
+            docker pull marcomerini/nutri-app:latest
+            
+            # Derruba o container e sobe novamente forçando recriação sem variáveis dinâmicas
+            docker compose down
+            docker compose up -d --force-recreate
+            
             # Remove imagens antigas para liberar espaço
             docker image prune -f
-            echo "Deploy concluido. Tag: ${TAG}"
+            echo "Deploy concluido com a nova versão."
