@@ -69,12 +69,12 @@ jobs:
         run: dotnet restore
 
       - name: Build Blazor Components
-        run: dotnet build NutriFlow/NutriFlow.csproj --no-restore -c Release --verbosity normal
+        run: dotnet build NutriFlow.csproj --no-restore -c Release --verbosity normal
 
       - name: Validar estrutura Razor/Blazor
         run: |
           echo "✓ Componentes Razor/Blazor compilados com sucesso"
-          find NutriFlow/Components -name "*.razor" -type f | wc -l
+          find Components -name "*.razor" -type f | wc -l
 
   # ─────────────────────────────────────────────
   # 3. Análise SonarCloud
