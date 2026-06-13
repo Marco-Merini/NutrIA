@@ -337,8 +337,7 @@ static void ConfigurePipeline(WebApplication app)
             "img-src 'self' data:; " +
             "connect-src 'self' ws: wss: http://localhost:* https://localhost:* https://dietanutriai.online https://www.dietanutriai.online; " +
             "form-action 'self'; " +
-            "frame-ancestors 'none'; " +
-            "upgrade-insecure-requests;");
+            "frame-ancestors 'none'; ");
         context.Response.Headers.Append("X-Frame-Options", "DENY");
         context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
         context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
@@ -352,7 +351,7 @@ static void ConfigurePipeline(WebApplication app)
         app.UseHsts();
     }
 
-    app.UseHttpsRedirection();
+    //app.UseHttpsRedirection();
     app.UseStaticFiles();
     app.UseAntiforgery();
 
