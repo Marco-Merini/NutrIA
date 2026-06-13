@@ -153,12 +153,27 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     try
     {
+        var dbConnection = db.Database.GetDbConnection();
+        Log.Information("Iniciando validação de Database. Connection String ativa (banco): {Database}", dbConnection.Database);
+        
+        var pendingMigrations = await db.Database.GetPendingMigrationsAsync();
+        if (pendingMigrations.Any())
+        {
+            Log.Information("Migrations pendentes encontradas: {Migrations}", string.Join(", ", pendingMigrations));
+        }
+        else
+        {
+            Log.Information("Nenhuma migration pendente. O banco de dados está atualizado.");
+        }
+
         await db.Database.MigrateAsync();
-        Log.Information("Database migration completed successfully");
+        
+        var appliedMigrations = await db.Database.GetAppliedMigrationsAsync();
+        Log.Information("Database migration completed successfully. Total de migrations aplicadas no banco: {Count}", appliedMigrations.Count());
     }
     catch (Exception ex)
     {
-        Log.Error(ex, "An error occurred during database migration");
+        Log.Error(ex, "An error occurred during database migration. Verifique a consistência do banco de dados.");
         throw;
     }
 }
