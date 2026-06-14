@@ -110,6 +110,10 @@ namespace NutriFlow.Repositories
                     ? query.OrderByDescending(p => p.DataCriacao)
                     : query.OrderBy(p => p.DataCriacao),
 
+                "caloriasdiarias" => isDesc
+                    ? query.OrderByDescending(p => p.CaloriasDiarias)
+                    : query.OrderBy(p => p.CaloriasDiarias),
+
                 _ => query.OrderByDescending(p => p.DataCriacao)
             };
         }

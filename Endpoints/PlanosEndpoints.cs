@@ -11,18 +11,20 @@ namespace NutriFlow.Endpoints
     {
         public static void MapPlanosEndpoints(this IEndpointRouteBuilder routes)
         {
-            routes.MapGet("/api/v1/planos", async (
-                HttpContext httpContext,
-                [AsParameters] PlanoDietaFilter filter,
-                IPlanoDietaService service) =>
-            {
-                var userIdClaim = httpContext.User.FindFirst("UsuarioId")?.Value;
-                if (!int.TryParse(userIdClaim, out int userId))
-                    return Results.Unauthorized();
+            routes.MapGet("/api/v1/planos", GetPlanosAsync).RequireAuthorization();
+        }
 
-                var result = await service.GetPlanosFiltradosAsync(userId, filter);
-                return Results.Ok(result);
-            }).RequireAuthorization();
+        public static async Task<IResult> GetPlanosAsync(
+            HttpContext httpContext,
+            [AsParameters] PlanoDietaFilter filter,
+            IPlanoDietaService service)
+        {
+            var userIdClaim = httpContext.User.FindFirst("UsuarioId")?.Value;
+            if (!int.TryParse(userIdClaim, out int userId))
+                return Results.Unauthorized();
+
+            var result = await service.GetPlanosFiltradosAsync(userId, filter);
+            return Results.Ok(result);
         }
     }
 }

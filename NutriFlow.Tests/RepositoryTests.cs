@@ -236,23 +236,28 @@ namespace NutriFlow.Tests
             var (context, connection) = CreateSQLiteContext();
             try
             {
-                context.Usuarios.Add(new Usuario { Id = 10, Nome = "Nutri 10", Email = "n10@test.com", Senha = "hash", Ativo = "S" });
+                context.Usuarios.AddRange(
+                    new Usuario { Id = 10, Nome = "Nutri 10", Email = "n10@test.com", Senha = "hash", Ativo = "S" },
+                    new Usuario { Id = 99, Nome = "Nutri 99", Email = "n99@test.com", Senha = "hash", Ativo = "S" }
+                );
                 await context.SaveChangesAsync();
 
                 var paciente1 = new Paciente { Id = 1, UsuarioId = 10, Nome = "Paciente 1" };
                 var paciente2 = new Paciente { Id = 2, UsuarioId = 10, Nome = "Paciente 2" };
-                context.Pacientes.AddRange(paciente1, paciente2);
+                var pacienteOutro = new Paciente { Id = 9, UsuarioId = 99, Nome = "Paciente Outro" };
+                context.Pacientes.AddRange(paciente1, paciente2, pacienteOutro);
 
                 context.PlanosDieta.AddRange(
-                    new PlanoDieta { Id = 1, PacienteId = 1, Paciente = paciente1, Titulo = "Plano Especial A", DataCriacao = new DateTime(2026, 6, 1) },
-                    new PlanoDieta { Id = 2, PacienteId = 1, Paciente = paciente1, Titulo = "Dieta B", DataCriacao = new DateTime(2026, 6, 5) },
-                    new PlanoDieta { Id = 3, PacienteId = 2, Paciente = paciente2, Titulo = "Plano Especial C", DataCriacao = new DateTime(2026, 6, 10) }
+                    new PlanoDieta { Id = 1, PacienteId = 1, Paciente = paciente1, Titulo = "Plano Especial A", DataCriacao = new DateTime(2026, 6, 1), CaloriasDiarias = 1500M },
+                    new PlanoDieta { Id = 2, PacienteId = 1, Paciente = paciente1, Titulo = "Dieta B", DataCriacao = new DateTime(2026, 6, 5), CaloriasDiarias = 2200M },
+                    new PlanoDieta { Id = 3, PacienteId = 2, Paciente = paciente2, Titulo = "Plano Especial C", DataCriacao = new DateTime(2026, 6, 10), CaloriasDiarias = 1800M },
+                    new PlanoDieta { Id = 99, PacienteId = 9, Paciente = pacienteOutro, Titulo = "Plano Secreto", DataCriacao = new DateTime(2026, 6, 1) }
                 );
                 await context.SaveChangesAsync();
 
                 var repository = new PlanoDietaRepository(context);
 
-                // 1. Filtrar por Nome (contendo "Especial")
+                // 1. Filtrar por Nome (contendo "Especial") + Multi-tenant isolation (não deve trazer o plano de UsuarioId 99)
                 var (items, count) = await repository.GetPlanosFiltradosAsync(10, new PlanoDietaFilter { Nome = "Especial", Page = 1, PageSize = 10 });
                 Assert.Equal(2, count);
                 Assert.Contains(items, p => p.Titulo == "Plano Especial A");
@@ -274,18 +279,31 @@ namespace NutriFlow.Tests
                 Assert.Equal(1, count3);
                 Assert.Equal("Dieta B", items3.First().Titulo);
 
-                // 4. Paginação (Página 2, tamanho 1, ordenado por data descendente por padrão)
+                // 4. Paginação e Ordenação Ascendente por Titulo
                 var (items4, count4) = await repository.GetPlanosFiltradosAsync(10, new PlanoDietaFilter 
                 { 
-                    Page = 2, 
-                    PageSize = 1, 
-                    SortBy = "DataCriacao", 
-                    SortDirection = "desc" 
+                    Page = 1, 
+                    PageSize = 10, 
+                    SortBy = "titulo", 
+                    SortDirection = "asc" 
                 });
                 Assert.Equal(3, count4);
-                Assert.Single(items4);
-                // Ordem esperada desc: Plano Especial C (dia 10), Dieta B (dia 5), Plano Especial A (dia 1). Página 2 tamanho 1 deve ser Dieta B.
-                Assert.Equal("Dieta B", items4.First().Titulo);
+                Assert.Equal("Dieta B", items4[0].Titulo); // D, P, P
+                Assert.Equal("Plano Especial A", items4[1].Titulo);
+                Assert.Equal("Plano Especial C", items4[2].Titulo);
+
+                // 5. Ordenação Descendente por CaloriasDiarias
+                var (items5, count5) = await repository.GetPlanosFiltradosAsync(10, new PlanoDietaFilter 
+                { 
+                    Page = 1, 
+                    PageSize = 10, 
+                    SortBy = "caloriasdiarias", 
+                    SortDirection = "desc" 
+                });
+                Assert.Equal(3, count5);
+                Assert.Equal(2200M, items5[0].CaloriasDiarias); // 2200, 1800, 1500
+                Assert.Equal(1800M, items5[1].CaloriasDiarias);
+                Assert.Equal(1500M, items5[2].CaloriasDiarias);
             }
             finally
             {
@@ -300,23 +318,28 @@ namespace NutriFlow.Tests
             var (context, connection) = CreateSQLiteContext();
             try
             {
-                context.Usuarios.Add(new Usuario { Id = 10, Nome = "Nutri 10", Email = "n10@test.com", Senha = "hash", Ativo = "S" });
+                context.Usuarios.AddRange(
+                    new Usuario { Id = 10, Nome = "Nutri 10", Email = "n10@test.com", Senha = "hash", Ativo = "S" },
+                    new Usuario { Id = 99, Nome = "Nutri 99", Email = "n99@test.com", Senha = "hash", Ativo = "S" }
+                );
                 await context.SaveChangesAsync();
 
                 var paciente1 = new Paciente { Id = 1, UsuarioId = 10, Nome = "Paciente 1" };
                 var paciente2 = new Paciente { Id = 2, UsuarioId = 10, Nome = "Paciente 2" };
-                context.Pacientes.AddRange(paciente1, paciente2);
+                var pacienteOutro = new Paciente { Id = 9, UsuarioId = 99, Nome = "Paciente Outro" };
+                context.Pacientes.AddRange(paciente1, paciente2, pacienteOutro);
 
                 context.Progressos.AddRange(
                     new Progresso { Id = 1, PacienteId = 1, Paciente = paciente1, Peso = 70.5m, DataRegistro = new DateTime(2026, 6, 1), DataCriacao = new DateTime(2026, 6, 1) },
                     new Progresso { Id = 2, PacienteId = 1, Paciente = paciente1, Peso = 69.2m, DataRegistro = new DateTime(2026, 6, 5), DataCriacao = new DateTime(2026, 6, 5) },
-                    new Progresso { Id = 3, PacienteId = 2, Paciente = paciente2, Peso = 85.0m, DataRegistro = new DateTime(2026, 6, 10), DataCriacao = new DateTime(2026, 6, 10) }
+                    new Progresso { Id = 3, PacienteId = 2, Paciente = paciente2, Peso = 85.0m, DataRegistro = new DateTime(2026, 6, 10), DataCriacao = new DateTime(2026, 6, 10) },
+                    new Progresso { Id = 99, PacienteId = 9, Paciente = pacienteOutro, Peso = 90m, DataRegistro = new DateTime(2026, 6, 1), DataCriacao = new DateTime(2026, 6, 1) }
                 );
                 await context.SaveChangesAsync();
 
                 var repository = new ProgressoRepository(context);
 
-                // 1. Filtrar por PacienteId
+                // 1. Filtrar por PacienteId + Multi-tenant isolation
                 var (items, count) = await repository.GetProgressosFiltradosAsync(10, new ProgressoFilter { PacienteId = 1, Page = 1, PageSize = 10 });
                 Assert.Equal(2, count);
                 Assert.All(items, p => Assert.Equal(1, p.PacienteId));
@@ -331,6 +354,19 @@ namespace NutriFlow.Tests
                 });
                 Assert.Equal(1, count2);
                 Assert.Equal(69.2m, items2.First().Peso);
+
+                // 3. Ordenação por DataRegistro Ascendente
+                var (items3, count3) = await repository.GetProgressosFiltradosAsync(10, new ProgressoFilter 
+                { 
+                    Page = 1, 
+                    PageSize = 10, 
+                    SortBy = "dataregistro", 
+                    SortDirection = "asc" 
+                });
+                Assert.Equal(3, count3);
+                Assert.Equal(70.5m, items3[0].Peso); // 1, 5, 10
+                Assert.Equal(69.2m, items3[1].Peso);
+                Assert.Equal(85.0m, items3[2].Peso);
             }
             finally
             {
@@ -345,23 +381,28 @@ namespace NutriFlow.Tests
             var (context, connection) = CreateSQLiteContext();
             try
             {
-                context.Usuarios.Add(new Usuario { Id = 10, Nome = "Nutri 10", Email = "n10@test.com", Senha = "hash", Ativo = "S" });
+                context.Usuarios.AddRange(
+                    new Usuario { Id = 10, Nome = "Nutri 10", Email = "n10@test.com", Senha = "hash", Ativo = "S" },
+                    new Usuario { Id = 99, Nome = "Nutri 99", Email = "n99@test.com", Senha = "hash", Ativo = "S" }
+                );
                 await context.SaveChangesAsync();
 
                 var paciente1 = new Paciente { Id = 1, UsuarioId = 10, Nome = "Paciente 1" };
                 var paciente2 = new Paciente { Id = 2, UsuarioId = 10, Nome = "Paciente 2" };
-                context.Pacientes.AddRange(paciente1, paciente2);
+                var pacienteOutro = new Paciente { Id = 9, UsuarioId = 99, Nome = "Paciente Outro" };
+                context.Pacientes.AddRange(paciente1, paciente2, pacienteOutro);
 
                 context.Sessoes.AddRange(
                     new Sessao { Id = 1, PacienteId = 1, Paciente = paciente1, Tipo = "Avaliação", DataSessao = new DateTime(2026, 6, 1), DataCriacao = new DateTime(2026, 6, 1) },
                     new Sessao { Id = 2, PacienteId = 1, Paciente = paciente1, Tipo = "Retorno", DataSessao = new DateTime(2026, 6, 5), DataCriacao = new DateTime(2026, 6, 5) },
-                    new Sessao { Id = 3, PacienteId = 2, Paciente = paciente2, Tipo = "Avaliação", DataSessao = new DateTime(2026, 6, 10), DataCriacao = new DateTime(2026, 6, 10) }
+                    new Sessao { Id = 3, PacienteId = 2, Paciente = paciente2, Tipo = "Avaliação", DataSessao = new DateTime(2026, 6, 10), DataCriacao = new DateTime(2026, 6, 10) },
+                    new Sessao { Id = 99, PacienteId = 9, Paciente = pacienteOutro, Tipo = "Consulta Secreta", DataSessao = new DateTime(2026, 6, 1), DataCriacao = new DateTime(2026, 6, 1) }
                 );
                 await context.SaveChangesAsync();
 
                 var repository = new SessaoRepository(context);
 
-                // 1. Filtrar por PacienteId
+                // 1. Filtrar por PacienteId + Multi-tenant isolation
                 var (items, count) = await repository.GetSessoesFiltradasAsync(10, new SessaoFilter { PacienteId = 1, Page = 1, PageSize = 10 });
                 Assert.Equal(2, count);
                 Assert.All(items, s => Assert.Equal(1, s.PacienteId));
@@ -376,6 +417,18 @@ namespace NutriFlow.Tests
                 });
                 Assert.Equal(1, count2);
                 Assert.Equal("Retorno", items2.First().Tipo);
+
+                // 3. Ordenação por DataSessao Ascendente
+                var (items3, count3) = await repository.GetSessoesFiltradasAsync(10, new SessaoFilter 
+                { 
+                    Page = 1, 
+                    PageSize = 10, 
+                    SortBy = "datasessao", 
+                    SortDirection = "asc" 
+                });
+                Assert.Equal(3, count3);
+                Assert.Equal("Avaliação", items3[0].Tipo); // 1, 5, 10
+                Assert.Equal("Retorno", items3[1].Tipo);
             }
             finally
             {

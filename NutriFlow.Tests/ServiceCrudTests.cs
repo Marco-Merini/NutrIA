@@ -254,5 +254,87 @@ namespace NutriFlow.Tests
             repo.Verify(r => r.Update(It.IsAny<Progresso>()), Times.Never);
             repo.Verify(r => r.SaveChangesAsync(), Times.Once);
         }
+
+        [Fact]
+        public async Task PlanoDietaService_GetPlanosFiltradosAsync_CallsRepositoryAndMapsToDto()
+        {
+            var repo = new Mock<IPlanoDietaRepository>();
+            var service = new PlanoDietaService(repo.Object, Mock.Of<ILogger<PlanoDietaService>>());
+            var filter = new PlanoDietaFilter { Page = 1, PageSize = 10 };
+            
+            var paciente = new Paciente { Id = 5, Nome = "Lucas" };
+            var planos = new List<PlanoDieta> 
+            { 
+                new() { Id = 1, Titulo = "Plano A", PacienteId = 5, Paciente = paciente, CaloriasDiarias = 2500M } 
+            };
+
+            repo.Setup(r => r.GetPlanosFiltradosAsync(10, filter))
+                .ReturnsAsync((planos, 1));
+
+            var result = await service.GetPlanosFiltradosAsync(10, filter);
+
+            Assert.NotNull(result);
+            Assert.Equal(1, result.TotalCount);
+            Assert.Single(result.Items);
+            var dto = result.Items[0];
+            Assert.Equal(1, dto.Id);
+            Assert.Equal("Plano A", dto.Titulo);
+            Assert.Equal("Lucas", dto.PacienteNome);
+            Assert.Equal(2500M, dto.CaloriasDiarias);
+        }
+
+        [Fact]
+        public async Task ProgressoService_GetProgressosFiltradosAsync_CallsRepositoryAndMapsToDto()
+        {
+            var repo = new Mock<IProgressoRepository>();
+            var service = new ProgressoService(repo.Object, Mock.Of<ILogger<ProgressoService>>());
+            var filter = new ProgressoFilter { Page = 1, PageSize = 10 };
+            
+            var paciente = new Paciente { Id = 5, Nome = "Lucas" };
+            var progressos = new List<Progresso> 
+            { 
+                new() { Id = 1, PacienteId = 5, Paciente = paciente, Peso = 75.5M } 
+            };
+
+            repo.Setup(r => r.GetProgressosFiltradosAsync(10, filter))
+                .ReturnsAsync((progressos, 1));
+
+            var result = await service.GetProgressosFiltradosAsync(10, filter);
+
+            Assert.NotNull(result);
+            Assert.Equal(1, result.TotalCount);
+            Assert.Single(result.Items);
+            var dto = result.Items[0];
+            Assert.Equal(1, dto.Id);
+            Assert.Equal("Lucas", dto.PacienteNome);
+            Assert.Equal(75.5M, dto.Peso);
+        }
+
+        [Fact]
+        public async Task SessaoService_GetSessoesFiltradasAsync_CallsRepositoryAndMapsToDto()
+        {
+            var repo = new Mock<ISessaoRepository>();
+            var service = new SessaoService(repo.Object, Mock.Of<ILogger<SessaoService>>());
+            var filter = new SessaoFilter { Page = 1, PageSize = 10 };
+            
+            var paciente = new Paciente { Id = 5, Nome = "Lucas" };
+            var sessoes = new List<Sessao> 
+            { 
+                new() { Id = 1, PacienteId = 5, Paciente = paciente, Tipo = "Retorno" } 
+            };
+
+            repo.Setup(r => r.GetSessoesFiltradasAsync(10, filter))
+                .ReturnsAsync((sessoes, 1));
+
+            var result = await service.GetSessoesFiltradasAsync(10, filter);
+
+            Assert.NotNull(result);
+            Assert.Equal(1, result.TotalCount);
+            Assert.Single(result.Items);
+            var dto = result.Items[0];
+            Assert.Equal(1, dto.Id);
+            Assert.Equal("Lucas", dto.PacienteNome);
+            Assert.Equal("Retorno", dto.Tipo);
+        }
     }
 }

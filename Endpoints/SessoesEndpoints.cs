@@ -11,18 +11,20 @@ namespace NutriFlow.Endpoints
     {
         public static void MapSessoesEndpoints(this IEndpointRouteBuilder routes)
         {
-            routes.MapGet("/api/v1/sessoes", async (
-                HttpContext httpContext,
-                [AsParameters] SessaoFilter filter,
-                ISessaoService service) =>
-            {
-                var userIdClaim = httpContext.User.FindFirst("UsuarioId")?.Value;
-                if (!int.TryParse(userIdClaim, out int userId))
-                    return Results.Unauthorized();
+            routes.MapGet("/api/v1/sessoes", GetSessoesAsync).RequireAuthorization();
+        }
 
-                var result = await service.GetSessoesFiltradasAsync(userId, filter);
-                return Results.Ok(result);
-            }).RequireAuthorization();
+        public static async Task<IResult> GetSessoesAsync(
+            HttpContext httpContext,
+            [AsParameters] SessaoFilter filter,
+            ISessaoService service)
+        {
+            var userIdClaim = httpContext.User.FindFirst("UsuarioId")?.Value;
+            if (!int.TryParse(userIdClaim, out int userId))
+                return Results.Unauthorized();
+
+            var result = await service.GetSessoesFiltradasAsync(userId, filter);
+            return Results.Ok(result);
         }
     }
 }
