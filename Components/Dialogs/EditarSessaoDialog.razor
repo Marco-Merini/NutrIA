@@ -7,14 +7,14 @@
 
 <MudDialog>
     <TitleContent>
-        <MudText Typo="Typo.h6" Class="font-bold">Nova Sessão</MudText>
+        <MudText Typo="Typo.h6" Class="font-bold">Editar Sessão</MudText>
     </TitleContent>
     <DialogContent>
         <MudForm @ref="form" @bind-IsValid="success">
             <MudGrid Spacing="4">
                 <MudItem xs="12">
                     <MudSelect T="int?" @bind-Value="SessaoModel.PacienteId" Label="Paciente *" Placeholder="Selecione o paciente"
-                               Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" RequiredError="Selecione um paciente">
+                               Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" RequiredError="Selecione um paciente" Disabled="true">
                         @foreach (var p in Pacientes)
                         {
                             <MudSelectItem T="int?" Value="@p.Id">@p.Nome</MudSelectItem>
@@ -66,7 +66,7 @@
             }
             else
             {
-                <span>Registrar Sessão</span>
+                <span>Salvar Alterações</span>
             }
         </MudButton>
     </DialogActions>
@@ -76,11 +76,13 @@
     [CascadingParameter]
     private IMudDialogInstance MudDialog { get; set; } = null!;
 
+    [Parameter]
+    public Sessao SessaoModel { get; set; } = new();
+
     private MudForm form = null!;
     private bool success;
     private bool IsSaving;
 
-    private Sessao SessaoModel { get; set; } = new() { DataSessao = DateTime.Today };
     private List<Paciente> Pacientes { get; set; } = new();
 
     protected override async Task OnInitializedAsync()
@@ -100,20 +102,20 @@
         IsSaving = true;
         try
         {
-            var created = await SessaoService.AddSessaoAsync(SessaoModel);
-            if (created)
+            var updated = await SessaoService.UpdateSessaoAsync(SessaoModel);
+            if (updated)
             {
-                Snackbar.Add("Sessão registrada com sucesso!", Severity.Success);
+                Snackbar.Add("Sessão atualizada com sucesso!", Severity.Success);
                 MudDialog.Close(DialogResult.Ok(true));
             }
             else
             {
-                Snackbar.Add("Erro ao registrar sessão.", Severity.Error);
+                Snackbar.Add("Erro ao atualizar sessão.", Severity.Error);
             }
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Erro ao registrar sessão: {ex.InnerException?.Message ?? ex.Message}", Severity.Error);
+            Snackbar.Add($"Erro ao atualizar sessão: {ex.InnerException?.Message ?? ex.Message}", Severity.Error);
         }
         finally
         {

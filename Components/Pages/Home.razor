@@ -201,7 +201,6 @@
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erro ao carregar dashboard: {ex.InnerException?.Message ?? ex.Message}");
             Snackbar.Add("Erro ao carregar dados do dashboard.", Severity.Error);
         }
     }

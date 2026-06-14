@@ -100,7 +100,6 @@ namespace NutriFlow.Services
                 existing.Status = paciente.Status;
                 existing.DataAtualizacao = DateTime.Now;
 
-                _pacienteRepository.Update(existing);
                 await _pacienteRepository.SaveChangesAsync();
                 return true;
             }

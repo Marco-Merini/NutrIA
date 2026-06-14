@@ -9,5 +9,6 @@ namespace NutriFlow.Repositories
         Task<List<Sessao>> GetSessoesPorUsuarioAsync(int usuarioId);
         Task<List<Sessao>> GetSessoesRecentesPorUsuarioAsync(int usuarioId, int count);
         Task<int> GetSessoesCountPorUsuarioAsync(int usuarioId);
+        Task<(List<Sessao> Items, int TotalCount)> GetSessoesFiltradasAsync(int usuarioId, SessaoFilter filter);
     }
 }

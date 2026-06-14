@@ -23,9 +23,7 @@
 
 <!-- Search Bar -->
 <div class="mb-6">
-    <MudTextField @bind-Value="searchTerm" Placeholder="Buscar paciente por nome ou email..." 
-                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" 
-                  Variant="Variant.Outlined" Class="nutri-search-input bg-white" Underline="false" />
+    <MudTextField @bind-Value="searchTerm" Label="Pacientes" Placeholder="Buscar por nome ou e-mail..." Clearable="true" Variant="Variant.Filled" Margin="Margin.Dense" />
 </div>
 
 <!-- Patient List -->

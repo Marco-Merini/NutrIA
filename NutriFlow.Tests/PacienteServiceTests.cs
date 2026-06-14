@@ -111,6 +111,8 @@ namespace NutriFlow.Tests
             var saved = _pacientesList.FirstOrDefault(x => x.Id == 1);
             Assert.NotNull(saved);
             Assert.Equal("Nome Novo", saved.Nome);
+            _pacienteRepoMock.Verify(r => r.Update(It.IsAny<Paciente>()), Times.Never);
+            _pacienteRepoMock.Verify(r => r.SaveChangesAsync(), Times.Once);
         }
 
         [Fact]

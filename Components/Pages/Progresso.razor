@@ -23,62 +23,73 @@
     </MudButton>
 </div>
 
+<!-- Filtros de Pesquisa -->
+<MudPaper Class="pa-4 mb-6" Elevation="0" Style="border: 1px solid #f1f5f9; border-radius: 12px; background-color: #ffffff;">
+    <MudGrid Class="align-end">
+        <MudItem xs="12" sm="4">
+            <MudSelect T="int?" Label="Paciente" @bind-Value="filter.PacienteId" Clearable="true" AnchorOrigin="Origin.BottomCenter" Variant="Variant.Outlined" Margin="Margin.Dense">
+                <MudSelectItem T="int?" Value="null">Todos os Pacientes</MudSelectItem>
+                @foreach (var pac in pacientes)
+                {
+                    <MudSelectItem T="int?" Value="@((int?)pac.Id)">@pac.Nome</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="3">
+            <MudDatePicker @bind-Date="filter.DataInicio" Label="Data Início" Clearable="true" Editable="true" Format="dd/MM/yyyy" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        </MudItem>
+        <MudItem xs="12" sm="3">
+            <MudDatePicker @bind-Date="filter.DataFim" Label="Data Fim" Clearable="true" Editable="true" Format="dd/MM/yyyy" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        </MudItem>
+        <MudItem xs="12" sm="2" Class="d-flex gap-2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ApplyFilters" FullWidth="true" Class="text-none rounded-lg py-2">
+                Buscar
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" OnClick="ResetFilters" FullWidth="true" Class="text-none rounded-lg py-2">
+                Limpar
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
 @if (IsLoading)
 {
     <MudProgressCircular Color="Color.Primary" Indeterminate="true" Class="d-block mx-auto mt-16" />
 }
 else
 {
-    <!-- Filters -->
-    <div class="d-flex gap-2 mb-6" style="flex-wrap: wrap;">
-        <MudChip T="string" Color="@(filtroSelecionado == null ? Color.Primary : Color.Default)" 
-                 Variant="Variant.Filled" Style="@(filtroSelecionado == null ? "border-radius: 8px;" : "border-radius: 8px; background-color: #f0f2f5;")"
-                 OnClick="@(() => FiltrarPorPaciente(null))">
-            Todos
-        </MudChip>
-        @foreach (var paciente in pacientes)
-        {
-            <MudChip T="string" Color="@(filtroSelecionado == paciente.Id ? Color.Primary : Color.Default)" 
-                     Variant="Variant.Filled" 
-                     Style="@(filtroSelecionado == paciente.Id ? "border-radius: 8px;" : "border-radius: 8px; background-color: #f0f2f5;")"
-                     OnClick="@(() => FiltrarPorPaciente(paciente.Id))">
-                @paciente.Nome
-            </MudChip>
-        }
-    </div>
-
     <!-- Chart Area -->
-    @if (GetProgressosFiltrados().Any())
+    @if (paginatedResult.Items != null && paginatedResult.Items.Any(p => p.Peso != null))
     {
-        <MudPaper Class="nutri-card pa-6 mb-6" Elevation="0">
-            <MudText Typo="Typo.subtitle1" Class="font-bold mb-4">Evolução do Peso</MudText>
+        <MudPaper Class="nutri-card pa-6 mb-6" Elevation="0" Style="border: 1px solid #f1f5f9; border-radius: 12px;">
+            <MudText Typo="Typo.subtitle1" Class="font-bold mb-4">Evolução do Peso dos Pacientes</MudText>
             <MudChart ChartType="ChartType.Line" ChartSeries="@Series" @bind-SelectedIndex="Index" 
                       XAxisLabels="@XAxisLabels" Width="100%" Height="300px" ChartOptions="@Options" />
         </MudPaper>
     }
 
     <!-- Progress List -->
-    @if (!GetProgressosFiltrados().Any())
+    @if (paginatedResult.Items == null || !paginatedResult.Items.Any())
     {
         <MudPaper Class="pa-8 text-center" Elevation="0" Style="border: 1px solid #f1f5f9; border-radius: 12px;">
             <MudIcon Icon="@Icons.Material.Outlined.TrendingUp" Size="Size.Large" Style="color: #cbd5e1;" />
-            <MudText Typo="Typo.h6" Class="mt-4 font-bold" Style="color: #94a3b8;">Nenhum progresso registrado</MudText>
-            <MudText Typo="Typo.body2" Style="color: #94a3b8;" Class="mt-1">Clique em "Registrar Progresso" para registrar o primeiro acompanhamento.</MudText>
+            <MudText Typo="Typo.h6" Class="mt-4 font-bold" Style="color: #94a3b8;">Nenhum progresso encontrado</MudText>
+            <MudText Typo="Typo.body2" Style="color: #94a3b8;" Class="mt-1">Tente ajustar seus filtros de busca ou registre um novo acompanhamento.</MudText>
         </MudPaper>
     }
     else
     {
         <div class="d-flex flex-column gap-4">
-            @foreach (var p in GetProgressosFiltrados())
+            @foreach (var p in paginatedResult.Items)
             {
-                <MudPaper Class="nutri-card pa-4 d-flex justify-space-between align-start" Elevation="0">
+                <MudPaper Class="nutri-card pa-4 d-flex justify-space-between align-start" Elevation="0" Style="border: 1px solid #f1f5f9; border-radius: 12px; transition: transform 0.2s, box-shadow 0.2s;">
                     <div class="d-flex gap-4">
-                        <div class="stat-icon-wrapper icon-orange" style="width: 48px; height: 48px; flex-shrink: 0;">
+                        <div class="stat-icon-wrapper icon-orange" style="width: 48px; height: 48px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background-color: #fff3e0; color: #e65100; border-radius: 8px;">
                             <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Medium" />
                         </div>
                         <div>
                             <div class="d-flex align-center gap-3 mb-1">
-                                <MudText Typo="Typo.subtitle2" Class="font-bold">@(p.Paciente?.Nome ?? "-")</MudText>
+                                <MudText Typo="Typo.subtitle2" Class="font-bold">@(p.PacienteNome ?? "-")</MudText>
                                 <MudText Typo="Typo.caption" Style="color: #a0aabf;">@(p.DataRegistro?.ToString("dd/MM/yyyy") ?? "-")</MudText>
                             </div>
                             
@@ -123,38 +134,40 @@ else
                         </div>
                     </div>
                     
-                    <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Size="Size.Small" Color="Color.Error" 
-                                   OnClick="@(() => ExcluirProgresso(p))" />
+                    <div class="d-flex align-center gap-2">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" 
+                                       OnClick="@(() => AbrirEditarProgresso(p))" />
+                        <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Size="Size.Small" Color="Color.Error" 
+                                       OnClick="@(() => ExcluirProgresso(p))" />
+                    </div>
                 </MudPaper>
             }
         </div>
+
+        <!-- Paginação -->
+        @if (paginatedResult.TotalPages > 1)
+        {
+            <div class="d-flex justify-center mt-6">
+                <MudPagination SelectedChanged="OnPageChanged" Count="paginatedResult.TotalPages" Selected="filter.Page" Variant="Variant.Outlined" Color="Color.Primary" Class="rounded-lg" />
+            </div>
+        }
     }
 }
 
 @code {
     private int Index = -1;
     private bool IsLoading = true;
-    private int? filtroSelecionado = null;
 
     private List<NutriFlow.Models.Paciente> pacientes = new();
-    private List<NutriFlow.Models.Progresso> progressos = new();
-
-    private List<NutriFlow.Models.Progresso> GetProgressosFiltrados()
-    {
-        if (filtroSelecionado == null)
-            return progressos;
-
-        return progressos
-            .Where(p => p.PacienteId == filtroSelecionado)
-            .ToList();
-    }
+    private ProgressoFilter filter = new() { Page = 1, PageSize = 10, SortBy = "DataRegistro", SortDirection = "desc" };
+    private PaginatedResult<ProgressoResponseDto> paginatedResult = new();
 
     private ChartOptions Options { get; set; } = new()
     {
         LineStrokeWidth = 3,
         MaxNumYAxisTicks = 5,
         YAxisFormat = "0 'kg'",
-        ChartPalette = new[] { "#2bd07b" }
+        ChartPalette = new[] { "#e65100" }
     };
 
     public List<ChartSeries> Series { get; set; } = new();
@@ -165,8 +178,6 @@ else
         if (firstRender)
         {
             await AuthService.InitializeAsync();
-
-
             await LoadData();
             StateHasChanged();
         }
@@ -178,26 +189,15 @@ else
         try
         {
             var userId = AuthService.CurrentUser!.Id;
-
-            pacientes = await PacienteService.GetPacientesByUsuarioIdAsync(userId);
-
-            var resultProgressos = new List<NutriFlow.Models.Progresso>();
-            foreach (var p in pacientes)
+            if (!pacientes.Any())
             {
-                var pacProgressos = await ProgressoService.GetProgressosPorPacienteAsync(p.Id);
-                foreach (var prg in pacProgressos)
-                {
-                    prg.Paciente = p;
-                }
-                resultProgressos.AddRange(pacProgressos);
+                pacientes = await PacienteService.GetPacientesByUsuarioIdAsync(userId);
             }
-            progressos = resultProgressos.OrderByDescending(p => p.DataRegistro).ToList();
-
+            paginatedResult = await ProgressoService.GetProgressosFiltradosAsync(userId, filter);
             AtualizarGrafico();
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erro ao carregar progressos: {ex.InnerException?.Message ?? ex.Message}");
             Snackbar.Add("Erro ao carregar progressos.", Severity.Error);
         }
         finally
@@ -206,31 +206,51 @@ else
         }
     }
 
-    private void FiltrarPorPaciente(int? pacienteId)
+    private async Task ApplyFilters()
     {
-        filtroSelecionado = pacienteId;
-        AtualizarGrafico();
+        filter.Page = 1;
+        await LoadData();
+    }
+
+    private async Task ResetFilters()
+    {
+        filter = new ProgressoFilter { Page = 1, PageSize = 10, SortBy = "DataRegistro", SortDirection = "desc" };
+        await LoadData();
+    }
+
+    private async Task OnPageChanged(int newPage)
+    {
+        filter.Page = newPage;
+        await LoadData();
     }
 
     private void AtualizarGrafico()
     {
-        var dados = GetProgressosFiltrados()
-            .Where(p => p.Peso != null && p.DataRegistro != null)
-            .OrderBy(p => p.DataRegistro)
-            .ToList();
-
-        if (dados.Any())
+        if (paginatedResult.Items != null && paginatedResult.Items.Any())
         {
-            Series = new List<ChartSeries>()
-            {
-                new ChartSeries()
-                {
-                    Name = "Peso",
-                    Data = dados.Select(p => (double)p.Peso!.Value).ToArray()
-                }
-            };
+            var dados = paginatedResult.Items
+                .Where(p => p.Peso != null && p.DataRegistro != null)
+                .OrderBy(p => p.DataRegistro)
+                .ToList();
 
-            XAxisLabels = dados.Select(p => p.DataRegistro!.Value.ToString("dd/MM/yyyy")).ToArray();
+            if (dados.Any())
+            {
+                Series = new List<ChartSeries>()
+                {
+                    new ChartSeries()
+                    {
+                        Name = "Peso",
+                        Data = dados.Select(p => (double)p.Peso!.Value).ToArray()
+                    }
+                };
+
+                XAxisLabels = dados.Select(p => p.DataRegistro!.Value.ToString("dd/MM/yyyy")).ToArray();
+            }
+            else
+            {
+                Series = new List<ChartSeries>();
+                XAxisLabels = Array.Empty<string>();
+            }
         }
         else
         {
@@ -238,7 +258,6 @@ else
             XAxisLabels = Array.Empty<string>();
         }
     }
-
 
     private async Task AbrirRegistrarProgresso()
     {
@@ -259,11 +278,38 @@ else
         }
     }
 
-    private async Task ExcluirProgresso(NutriFlow.Models.Progresso progresso)
+    private async Task AbrirEditarProgresso(ProgressoResponseDto progressoDto)
+    {
+        var progressoCompleto = await ProgressoService.GetProgressoByIdAsync(progressoDto.Id);
+        if (progressoCompleto == null)
+        {
+            Snackbar.Add("Erro ao carregar o progresso para edição.", Severity.Error);
+            return;
+        }
+
+        var parameters = new DialogParameters { ["ProgressoModel"] = progressoCompleto };
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+            CloseButton = true
+        };
+        var result = await DialogService.ShowAsync<NutriFlow.Components.Dialogs.EditarProgressoDialog>("Editar Progresso", parameters, options);
+        var dialogResult = await result.Result;
+
+        if (dialogResult != null && !dialogResult.Canceled)
+        {
+            await LoadData();
+            StateHasChanged();
+        }
+    }
+
+    private async Task ExcluirProgresso(ProgressoResponseDto progresso)
     {
         var confirm = await DialogService.ShowMessageBox(
             "Confirmar exclusão",
-            $"Deseja realmente excluir este registro de progresso de {progresso.Paciente?.Nome ?? "paciente"}?",
+            $"Deseja realmente excluir este registro de progresso de {progresso.PacienteNome ?? "paciente"}?",
             yesText: "Excluir",
             cancelText: "Cancelar");
 
@@ -271,10 +317,16 @@ else
 
         try
         {
-            await ProgressoService.DeleteProgressoAsync(progresso.Id);
-            progressos.Remove(progresso);
-            AtualizarGrafico();
-            Snackbar.Add("Progresso excluído com sucesso.", Severity.Success);
+            var deleted = await ProgressoService.DeleteProgressoAsync(progresso.Id);
+            if (deleted)
+            {
+                Snackbar.Add("Progresso excluído com sucesso.", Severity.Success);
+                await LoadData();
+            }
+            else
+            {
+                Snackbar.Add("Erro ao excluir progresso.", Severity.Error);
+            }
         }
         catch (Exception ex)
         {
@@ -282,3 +334,4 @@ else
         }
     }
 }
+

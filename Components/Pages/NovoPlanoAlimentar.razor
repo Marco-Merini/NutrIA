@@ -246,20 +246,26 @@
                     Calorias = rf.Calorias
                 }).ToList();
 
-            await PlanoDietaService.AddPlanoDietaAsync(plano);
+            var created = await PlanoDietaService.AddPlanoDietaAsync(plano);
 
-            if (plano.PacienteId.HasValue)
+            if (created)
             {
-                IndexacaoBackground.EnquileirarReindexacao(plano.PacienteId.Value, "criação de plano alimentar");
-            }
+                if (plano.PacienteId.HasValue)
+                {
+                    IndexacaoBackground.EnquileirarReindexacao(plano.PacienteId.Value, "criação de plano alimentar");
+                }
 
-            Snackbar.Add("Plano alimentar criado com sucesso!", Severity.Success);
-            NavigationManager.NavigateTo("/planos");
+                Snackbar.Add("Plano alimentar criado com sucesso!", Severity.Success);
+                NavigationManager.NavigateTo("/planos");
+            }
+            else
+            {
+                Snackbar.Add("Erro ao salvar plano.", Severity.Error);
+            }
         }
         catch (Exception ex)
         {
             var innerMsg = ex.InnerException?.Message ?? ex.Message;
-            Console.WriteLine($"Erro ao salvar plano: {innerMsg}");
             Snackbar.Add($"Erro ao salvar plano: {innerMsg}", Severity.Error);
         }
         finally
@@ -313,7 +319,6 @@
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erro ao gerar com IA: {ex.Message}");
             Snackbar.Add("Erro ao comunicar com a IA.", Severity.Error);
         }
         finally

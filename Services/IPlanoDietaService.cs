@@ -10,6 +10,8 @@ namespace NutriFlow.Services
         Task<PlanoDieta?> GetPlanoCompletoAsync(int id);
         Task<int> GetPlanosCountPorUsuarioAsync(int usuarioId);
         Task<bool> AddPlanoDietaAsync(PlanoDieta plano);
+        Task<bool> UpdatePlanoDietaAsync(PlanoDieta plano);
         Task<bool> DeletePlanoDietaAsync(int id);
+        Task<PaginatedResult<PlanoDietaResponseDto>> GetPlanosFiltradosAsync(int usuarioId, PlanoDietaFilter filter);
     }
 }

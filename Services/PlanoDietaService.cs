@@ -1,6 +1,7 @@
 using NutriFlow.Models;
 using NutriFlow.Repositories;
 using Microsoft.Extensions.Logging;
+using Mapster;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -93,6 +94,52 @@ namespace NutriFlow.Services
             {
                 _logger.LogError(ex, "Erro ao deletar plano de dieta {Id}", id);
                 return false;
+            }
+        }
+        public async Task<bool> UpdatePlanoDietaAsync(PlanoDieta plano)
+        {
+            try
+            {
+                var existing = await _planoDietaRepository.GetByIdAsync(plano.Id);
+                if (existing == null) return false;
+
+                existing.Titulo = plano.Titulo;
+                existing.Objetivo = plano.Objetivo;
+                existing.CaloriasDiarias = plano.CaloriasDiarias;
+                existing.ProteinasG = plano.ProteinasG;
+                existing.CarboidratosG = plano.CarboidratosG;
+                existing.GordurasG = plano.GordurasG;
+                existing.Orientacoes = plano.Orientacoes;
+                existing.ObservacoesNutricionista = plano.ObservacoesNutricionista;
+                existing.DataAtualizacao = DateTime.Now;
+
+                await _planoDietaRepository.SaveChangesAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao atualizar plano de dieta {Id}", plano.Id);
+                return false;
+            }
+        }
+
+        public async Task<PaginatedResult<PlanoDietaResponseDto>> GetPlanosFiltradosAsync(int usuarioId, PlanoDietaFilter filter)
+        {
+            try
+            {
+                var (items, totalCount) = await _planoDietaRepository.GetPlanosFiltradosAsync(usuarioId, filter);
+                
+                TypeAdapterConfig<PlanoDieta, PlanoDietaResponseDto>.NewConfig()
+                    .Map(dest => dest.PacienteNome, src => src.Paciente != null ? src.Paciente.Nome : null)
+                    .Map(dest => dest.RefeicoesCount, src => src.Refeicoes != null ? src.Refeicoes.Count : 0);
+
+                var dtos = items.Adapt<List<PlanoDietaResponseDto>>();
+                return new PaginatedResult<PlanoDietaResponseDto>(dtos, totalCount, filter.Page, filter.PageSize);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao buscar planos filtrados");
+                return new PaginatedResult<PlanoDietaResponseDto>();
             }
         }
     }

@@ -16,6 +16,8 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.OpenApi.Models;
 using Serilog;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Prometheus;
+using NutriFlow.Endpoints;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -208,6 +210,31 @@ app.MapGet("/api/v1/assistente/metricas", async (
     IAuditoriaService auditoriaService) => await HandleMetricasAsync(httpContext, auditoriaService))
 .RequireAuthorization();
 
+app.MapPut("/api/v1/planos/{id:int}", async (int id, NutriFlow.Models.PlanoDieta plano, IPlanoDietaService service) =>
+{
+    plano.Id = id;
+    var success = await service.UpdatePlanoDietaAsync(plano);
+    return success ? Results.Ok() : Results.NotFound();
+}).RequireAuthorization();
+
+app.MapPut("/api/v1/progresso/{id:int}", async (int id, NutriFlow.Models.Progresso progresso, IProgressoService service) =>
+{
+    progresso.Id = id;
+    var success = await service.UpdateProgressoAsync(progresso);
+    return success ? Results.Ok() : Results.NotFound();
+}).RequireAuthorization();
+
+app.MapPut("/api/v1/sessoes/{id:int}", async (int id, NutriFlow.Models.Sessao sessao, ISessaoService service) =>
+{
+    sessao.Id = id;
+    var success = await service.UpdateSessaoAsync(sessao);
+    return success ? Results.Ok() : Results.NotFound();
+}).RequireAuthorization();
+
+app.MapPlanosEndpoints();
+app.MapProgressoEndpoints();
+app.MapSessoesEndpoints();
+
 // ─── Endpoints de Versionamento e Observabilidade ──────────────────────────
 app.MapHealthChecks("/health");
 
@@ -354,6 +381,9 @@ static void ConfigurePipeline(WebApplication app)
     //app.UseHttpsRedirection();
     app.UseStaticFiles();
     app.UseAntiforgery();
+
+    app.UseMetricServer();
+    app.UseHttpMetrics();
 
     if (app.Environment.IsDevelopment())
     {

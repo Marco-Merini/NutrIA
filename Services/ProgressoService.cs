@@ -1,6 +1,7 @@
 using NutriFlow.Models;
 using NutriFlow.Repositories;
 using Microsoft.Extensions.Logging;
+using Mapster;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -89,6 +90,52 @@ namespace NutriFlow.Services
             {
                 _logger.LogError(ex, "Erro ao deletar progresso {Id}", id);
                 return false;
+            }
+        }
+        public async Task<bool> UpdateProgressoAsync(Progresso progresso)
+        {
+            try
+            {
+                var existing = await _progressoRepository.GetByIdAsync(progresso.Id);
+                if (existing == null) return false;
+
+                existing.DataRegistro = progresso.DataRegistro;
+                existing.Peso = progresso.Peso;
+                existing.CinturaCm = progresso.CinturaCm;
+                existing.QuadrilCm = progresso.QuadrilCm;
+                existing.PercentualGordura = progresso.PercentualGordura;
+                existing.AderenciaPlano = progresso.AderenciaPlano;
+                existing.Humor = progresso.Humor;
+                existing.Energia = progresso.Energia;
+                existing.Feedback = progresso.Feedback;
+                existing.DataAtualizacao = DateTime.Now;
+
+                await _progressoRepository.SaveChangesAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao atualizar progresso {Id}", progresso.Id);
+                return false;
+            }
+        }
+
+        public async Task<PaginatedResult<ProgressoResponseDto>> GetProgressosFiltradosAsync(int usuarioId, ProgressoFilter filter)
+        {
+            try
+            {
+                var (items, totalCount) = await _progressoRepository.GetProgressosFiltradosAsync(usuarioId, filter);
+                
+                TypeAdapterConfig<Progresso, ProgressoResponseDto>.NewConfig()
+                    .Map(dest => dest.PacienteNome, src => src.Paciente != null ? src.Paciente.Nome : null);
+
+                var dtos = items.Adapt<List<ProgressoResponseDto>>();
+                return new PaginatedResult<ProgressoResponseDto>(dtos, totalCount, filter.Page, filter.PageSize);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao buscar progressos filtrados");
+                return new PaginatedResult<ProgressoResponseDto>();
             }
         }
     }

@@ -13,6 +13,7 @@ COPY Migrations/ ./Migrations/
 COPY Models/ ./Models/
 COPY Repositories/ ./Repositories/
 COPY Services/ ./Services/
+COPY Endpoints/ ./Endpoints/
 COPY Properties/ ./Properties/
 COPY wwwroot/ ./wwwroot/
 COPY Program.cs ./

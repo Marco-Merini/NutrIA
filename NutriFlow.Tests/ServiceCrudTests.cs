@@ -194,5 +194,147 @@ namespace NutriFlow.Tests
             Assert.False(await service.AddProgressoAsync(new Progresso()));
             Assert.False(await service.DeleteProgressoAsync(1));
         }
+
+        [Fact]
+        public async Task SessaoService_UpdateSavesWithoutCallingRepositoryUpdate()
+        {
+            var repo = new Mock<ISessaoRepository>();
+            var service = new SessaoService(repo.Object, Mock.Of<ILogger<SessaoService>>());
+            var existing = new Sessao { Id = 1, Tipo = "Old" };
+            var updateModel = new Sessao { Id = 1, Tipo = "New", PesoSessao = 75.5M };
+
+            repo.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(existing);
+
+            var success = await service.UpdateSessaoAsync(updateModel);
+
+            Assert.True(success);
+            Assert.Equal("New", existing.Tipo);
+            Assert.Equal(75.5M, existing.PesoSessao);
+            Assert.NotNull(existing.DataAtualizacao);
+            repo.Verify(r => r.Update(It.IsAny<Sessao>()), Times.Never);
+            repo.Verify(r => r.SaveChangesAsync(), Times.Once);
+        }
+
+        [Fact]
+        public async Task PlanoDietaService_UpdateSavesWithoutCallingRepositoryUpdate()
+        {
+            var repo = new Mock<IPlanoDietaRepository>();
+            var service = new PlanoDietaService(repo.Object, Mock.Of<ILogger<PlanoDietaService>>());
+            var existing = new PlanoDieta { Id = 1, Titulo = "Old" };
+            var updateModel = new PlanoDieta { Id = 1, Titulo = "New", CaloriasDiarias = 2000M };
+
+            repo.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(existing);
+
+            var success = await service.UpdatePlanoDietaAsync(updateModel);
+
+            Assert.True(success);
+            Assert.Equal("New", existing.Titulo);
+            Assert.Equal(2000M, existing.CaloriasDiarias);
+            Assert.NotNull(existing.DataAtualizacao);
+            repo.Verify(r => r.Update(It.IsAny<PlanoDieta>()), Times.Never);
+            repo.Verify(r => r.SaveChangesAsync(), Times.Once);
+        }
+
+        [Fact]
+        public async Task ProgressoService_UpdateSavesWithoutCallingRepositoryUpdate()
+        {
+            var repo = new Mock<IProgressoRepository>();
+            var service = new ProgressoService(repo.Object, Mock.Of<ILogger<ProgressoService>>());
+            var existing = new Progresso { Id = 1, Humor = "Old" };
+            var updateModel = new Progresso { Id = 1, Humor = "New", Peso = 80.2M };
+
+            repo.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(existing);
+
+            var success = await service.UpdateProgressoAsync(updateModel);
+
+            Assert.True(success);
+            Assert.Equal("New", existing.Humor);
+            Assert.Equal(80.2M, existing.Peso);
+            Assert.NotNull(existing.DataAtualizacao);
+            repo.Verify(r => r.Update(It.IsAny<Progresso>()), Times.Never);
+            repo.Verify(r => r.SaveChangesAsync(), Times.Once);
+        }
+
+        [Fact]
+        public async Task PlanoDietaService_GetPlanosFiltradosAsync_CallsRepositoryAndMapsToDto()
+        {
+            var repo = new Mock<IPlanoDietaRepository>();
+            var service = new PlanoDietaService(repo.Object, Mock.Of<ILogger<PlanoDietaService>>());
+            var filter = new PlanoDietaFilter { Page = 1, PageSize = 10 };
+            
+            var paciente = new Paciente { Id = 5, Nome = "Lucas" };
+            var planos = new List<PlanoDieta> 
+            { 
+                new() { Id = 1, Titulo = "Plano A", PacienteId = 5, Paciente = paciente, CaloriasDiarias = 2500M } 
+            };
+
+            repo.Setup(r => r.GetPlanosFiltradosAsync(10, filter))
+                .ReturnsAsync((planos, 1));
+
+            var result = await service.GetPlanosFiltradosAsync(10, filter);
+
+            Assert.NotNull(result);
+            Assert.Equal(1, result.TotalCount);
+            Assert.Single(result.Items);
+            var dto = result.Items[0];
+            Assert.Equal(1, dto.Id);
+            Assert.Equal("Plano A", dto.Titulo);
+            Assert.Equal("Lucas", dto.PacienteNome);
+            Assert.Equal(2500M, dto.CaloriasDiarias);
+        }
+
+        [Fact]
+        public async Task ProgressoService_GetProgressosFiltradosAsync_CallsRepositoryAndMapsToDto()
+        {
+            var repo = new Mock<IProgressoRepository>();
+            var service = new ProgressoService(repo.Object, Mock.Of<ILogger<ProgressoService>>());
+            var filter = new ProgressoFilter { Page = 1, PageSize = 10 };
+            
+            var paciente = new Paciente { Id = 5, Nome = "Lucas" };
+            var progressos = new List<Progresso> 
+            { 
+                new() { Id = 1, PacienteId = 5, Paciente = paciente, Peso = 75.5M } 
+            };
+
+            repo.Setup(r => r.GetProgressosFiltradosAsync(10, filter))
+                .ReturnsAsync((progressos, 1));
+
+            var result = await service.GetProgressosFiltradosAsync(10, filter);
+
+            Assert.NotNull(result);
+            Assert.Equal(1, result.TotalCount);
+            Assert.Single(result.Items);
+            var dto = result.Items[0];
+            Assert.Equal(1, dto.Id);
+            Assert.Equal("Lucas", dto.PacienteNome);
+            Assert.Equal(75.5M, dto.Peso);
+        }
+
+        [Fact]
+        public async Task SessaoService_GetSessoesFiltradasAsync_CallsRepositoryAndMapsToDto()
+        {
+            var repo = new Mock<ISessaoRepository>();
+            var service = new SessaoService(repo.Object, Mock.Of<ILogger<SessaoService>>());
+            var filter = new SessaoFilter { Page = 1, PageSize = 10 };
+            
+            var paciente = new Paciente { Id = 5, Nome = "Lucas" };
+            var sessoes = new List<Sessao> 
+            { 
+                new() { Id = 1, PacienteId = 5, Paciente = paciente, Tipo = "Retorno" } 
+            };
+
+            repo.Setup(r => r.GetSessoesFiltradasAsync(10, filter))
+                .ReturnsAsync((sessoes, 1));
+
+            var result = await service.GetSessoesFiltradasAsync(10, filter);
+
+            Assert.NotNull(result);
+            Assert.Equal(1, result.TotalCount);
+            Assert.Single(result.Items);
+            var dto = result.Items[0];
+            Assert.Equal(1, dto.Id);
+            Assert.Equal("Lucas", dto.PacienteNome);
+            Assert.Equal("Retorno", dto.Tipo);
+        }
     }
 }

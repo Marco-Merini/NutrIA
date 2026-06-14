@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NutriFlow.Models;
 
 namespace NutriFlow.Data
@@ -77,6 +79,58 @@ namespace NutriFlow.Data
                 entity.HasIndex(e => e.PatientId).HasDatabaseName("IX_AuditLogs_PatientId");
                 entity.HasIndex(e => e.Timestamp).HasDatabaseName("IX_AuditLogs_Timestamp");
             });
+
+            if (Database.ProviderName == "Microsoft.EntityFrameworkCore.Sqlite")
+            {
+                ConfigureSqliteDecimalConverters(modelBuilder);
+            }
+        }
+
+            private static void ConfigureSqliteDecimalConverters(ModelBuilder modelBuilder)
+            {
+                foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+                {
+                    foreach (var property in GetDecimalProperties(entityType))
+                    {
+                        ApplyDecimalConverter(property);
+                    }
+                }
+            }
+
+        private static IEnumerable<IMutableProperty> GetDecimalProperties(IMutableEntityType entityType)
+        {
+            return entityType.GetProperties()
+                .Where(p =>
+                    p.ClrType == typeof(decimal) ||
+                    p.ClrType == typeof(decimal?));
+        }
+
+        private static void ApplyDecimalConverter(IMutableProperty property)
+        {
+            if (property.ClrType == typeof(decimal))
+            {
+                property.SetValueConverter(CreateDecimalConverter());
+                return;
+            }
+
+            if (property.ClrType == typeof(decimal?))
+            {
+                property.SetValueConverter(CreateNullableDecimalConverter());
+            }
+        }
+
+        private static ValueConverter<decimal, double> CreateDecimalConverter()
+        {
+            return new(
+                v => (double)v,
+                v => (decimal)v);
+        }
+
+        private static ValueConverter<decimal?, double?> CreateNullableDecimalConverter()
+        {
+            return new(
+                v => v.HasValue ? (double)v.Value : null,
+                v => v.HasValue ? (decimal)v.Value : null);
         }
     }
 }
