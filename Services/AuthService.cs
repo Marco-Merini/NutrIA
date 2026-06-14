@@ -145,7 +145,6 @@ namespace NutriFlow.Services
 
                 user.DataAtualizacao = DateTime.Now;
 
-                _usuarioRepository.Update(user);
                 await _usuarioRepository.SaveChangesAsync();
 
                 if (_currentUser?.Id == user.Id)

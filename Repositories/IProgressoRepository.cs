@@ -8,5 +8,6 @@ namespace NutriFlow.Repositories
     {
         Task<List<Progresso>> GetProgressosPorPacienteAsync(int pacienteId);
         Task<int> GetProgressosCountPorUsuarioAsync(int usuarioId);
+        Task<(List<Progresso> Items, int TotalCount)> GetProgressosFiltradosAsync(int usuarioId, ProgressoFilter filter);
     }
 }

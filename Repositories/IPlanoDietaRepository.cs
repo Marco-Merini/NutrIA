@@ -9,5 +9,6 @@ namespace NutriFlow.Repositories
         Task<List<PlanoDieta>> GetPlanosPorPacienteAsync(int pacienteId);
         Task<PlanoDieta?> GetPlanoCompletoAsync(int id);
         Task<int> GetPlanosCountPorUsuarioAsync(int usuarioId);
+        Task<(List<PlanoDieta> Items, int TotalCount)> GetPlanosFiltradosAsync(int usuarioId, PlanoDietaFilter filter);
     }
 }

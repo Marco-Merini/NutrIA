@@ -11,6 +11,8 @@ namespace NutriFlow.Services
         Task<int> GetSessoesCountPorUsuarioAsync(int usuarioId);
         Task<Sessao?> GetSessaoByIdAsync(int id);
         Task<bool> AddSessaoAsync(Sessao sessao);
+        Task<bool> UpdateSessaoAsync(Sessao sessao);
         Task<bool> DeleteSessaoAsync(int id);
+        Task<PaginatedResult<SessaoResponseDto>> GetSessoesFiltradasAsync(int usuarioId, SessaoFilter filter);
     }
 }

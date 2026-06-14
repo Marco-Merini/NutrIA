@@ -63,11 +63,11 @@ else
                 </MudItem>
 
                 <MudItem xs="12" sm="6">
-                    <MudNumericField T="decimal?" @bind-Value="PacienteModel.PesoAtual" Label="Peso Atual (kg)" Placeholder="70,5" Variant="Variant.Outlined" Margin="Margin.Dense" Step="0.1M" />
+                    <MudNumericField T="decimal?" @bind-Value="PacienteModel.PesoAtual" Label="Peso Atual (kg)" Placeholder="" Variant="Variant.Outlined" Margin="Margin.Dense" Step="0.1M" />
                 </MudItem>
 
                 <MudItem xs="12" sm="6">
-                    <MudNumericField T="decimal?" @bind-Value="PacienteModel.Altura" Label="Altura (cm)" Placeholder="175" Variant="Variant.Outlined" Margin="Margin.Dense" Step="1M" />
+                    <MudNumericField T="decimal?" @bind-Value="PacienteModel.Altura" Label="Altura (cm)" Placeholder="" Variant="Variant.Outlined" Margin="Margin.Dense" Step="1M" />
                 </MudItem>
 
                 <MudItem xs="12" sm="6">
@@ -156,7 +156,6 @@ else
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erro ao carregar paciente: {ex.Message}");
             Snackbar.Add("Erro ao carregar os dados do paciente.", Severity.Error);
         }
         finally
@@ -180,10 +179,16 @@ else
         IsSaving = true;
         try
         {
-            await PacienteService.UpdatePacienteAsync(PacienteModel);
-
-            Snackbar.Add("Paciente atualizado com sucesso!", Severity.Success);
-            NavigationManager.NavigateTo($"/pacientes/{Id}");
+            var updated = await PacienteService.UpdatePacienteAsync(PacienteModel);
+            if (updated)
+            {
+                Snackbar.Add("Paciente atualizado com sucesso!", Severity.Success);
+                NavigationManager.NavigateTo($"/pacientes/{Id}");
+            }
+            else
+            {
+                Snackbar.Add("Erro ao salvar alterações.", Severity.Error);
+            }
         }
         catch (Exception ex)
         {

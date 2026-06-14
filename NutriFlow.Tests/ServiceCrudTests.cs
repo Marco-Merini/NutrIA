@@ -194,5 +194,65 @@ namespace NutriFlow.Tests
             Assert.False(await service.AddProgressoAsync(new Progresso()));
             Assert.False(await service.DeleteProgressoAsync(1));
         }
+
+        [Fact]
+        public async Task SessaoService_UpdateSavesWithoutCallingRepositoryUpdate()
+        {
+            var repo = new Mock<ISessaoRepository>();
+            var service = new SessaoService(repo.Object, Mock.Of<ILogger<SessaoService>>());
+            var existing = new Sessao { Id = 1, Tipo = "Old" };
+            var updateModel = new Sessao { Id = 1, Tipo = "New", PesoSessao = 75.5M };
+
+            repo.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(existing);
+
+            var success = await service.UpdateSessaoAsync(updateModel);
+
+            Assert.True(success);
+            Assert.Equal("New", existing.Tipo);
+            Assert.Equal(75.5M, existing.PesoSessao);
+            Assert.NotNull(existing.DataAtualizacao);
+            repo.Verify(r => r.Update(It.IsAny<Sessao>()), Times.Never);
+            repo.Verify(r => r.SaveChangesAsync(), Times.Once);
+        }
+
+        [Fact]
+        public async Task PlanoDietaService_UpdateSavesWithoutCallingRepositoryUpdate()
+        {
+            var repo = new Mock<IPlanoDietaRepository>();
+            var service = new PlanoDietaService(repo.Object, Mock.Of<ILogger<PlanoDietaService>>());
+            var existing = new PlanoDieta { Id = 1, Titulo = "Old" };
+            var updateModel = new PlanoDieta { Id = 1, Titulo = "New", CaloriasDiarias = 2000M };
+
+            repo.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(existing);
+
+            var success = await service.UpdatePlanoDietaAsync(updateModel);
+
+            Assert.True(success);
+            Assert.Equal("New", existing.Titulo);
+            Assert.Equal(2000M, existing.CaloriasDiarias);
+            Assert.NotNull(existing.DataAtualizacao);
+            repo.Verify(r => r.Update(It.IsAny<PlanoDieta>()), Times.Never);
+            repo.Verify(r => r.SaveChangesAsync(), Times.Once);
+        }
+
+        [Fact]
+        public async Task ProgressoService_UpdateSavesWithoutCallingRepositoryUpdate()
+        {
+            var repo = new Mock<IProgressoRepository>();
+            var service = new ProgressoService(repo.Object, Mock.Of<ILogger<ProgressoService>>());
+            var existing = new Progresso { Id = 1, Humor = "Old" };
+            var updateModel = new Progresso { Id = 1, Humor = "New", Peso = 80.2M };
+
+            repo.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(existing);
+
+            var success = await service.UpdateProgressoAsync(updateModel);
+
+            Assert.True(success);
+            Assert.Equal("New", existing.Humor);
+            Assert.Equal(80.2M, existing.Peso);
+            Assert.NotNull(existing.DataAtualizacao);
+            repo.Verify(r => r.Update(It.IsAny<Progresso>()), Times.Never);
+            repo.Verify(r => r.SaveChangesAsync(), Times.Once);
+        }
     }
 }

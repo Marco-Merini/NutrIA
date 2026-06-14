@@ -4,6 +4,7 @@
 @using NutriFlow.Data
 @using NutriFlow.Models
 @using Microsoft.EntityFrameworkCore
+@using System.ComponentModel.DataAnnotations
 @inject NutriFlow.Services.IPacienteService PacienteService
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
@@ -41,7 +42,13 @@
             </MudItem>
 
             <MudItem xs="12" sm="6">
-                <MudTextField @bind-Value="PacienteModel.Email" Label="E-mail" InputType="InputType.Email" Placeholder="email@exemplo.com" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudTextField @bind-Value="PacienteModel.Email"
+                          Label="E-mail"
+                          InputType="InputType.Email"
+                          Placeholder="email@exemplo.com"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          Validation="@(new EmailAddressAttribute { ErrorMessage = "E-mail inválido" })" />
             </MudItem>
 
             <MudItem xs="12" sm="6">
@@ -49,11 +56,11 @@
             </MudItem>
 
             <MudItem xs="12" sm="6">
-                <MudNumericField T="decimal?" @bind-Value="PacienteModel.PesoAtual" Label="Peso Atual (kg)" Placeholder="70,5" Variant="Variant.Outlined" Margin="Margin.Dense" Step="0.1M" />
+                <MudNumericField T="decimal?" @bind-Value="PacienteModel.PesoAtual" Label="Peso Atual (kg)" Placeholder="" Variant="Variant.Outlined" Margin="Margin.Dense" Step="0.1M" />
             </MudItem>
 
             <MudItem xs="12" sm="6">
-                <MudNumericField T="decimal?" @bind-Value="PacienteModel.Altura" Label="Altura (cm)" Placeholder="175" Variant="Variant.Outlined" Margin="Margin.Dense" Step="1M" />
+                <MudNumericField T="decimal?" @bind-Value="PacienteModel.Altura" Label="Altura (cm)" Placeholder="" Variant="Variant.Outlined" Margin="Margin.Dense" Step="1M" />
             </MudItem>
 
             <MudItem xs="12" sm="6">

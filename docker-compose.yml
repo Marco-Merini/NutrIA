@@ -1,6 +1,9 @@
 services:
   nutri-app:
     image: marcomerini/nutri-app:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: nutri-app
     ports:
       - "8080:8080"
@@ -18,3 +21,22 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: always
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./Monitoring/prometheus:/etc/prometheus
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./Monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./Monitoring/grafana/dashboards:/var/lib/grafana/dashboards

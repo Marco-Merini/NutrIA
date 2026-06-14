@@ -22,37 +22,74 @@
     </MudButton>
 </div>
 
+<!-- Filtros de Pesquisa -->
+<MudPaper Class="pa-4 mb-4" Elevation="0" Style="border: 1px solid #f1f5f9; border-radius: 12px; background-color: #ffffff;">
+    <MudGrid Class="align-end">
+        <MudItem xs="12" sm="3">
+            <MudSelect T="int?" Label="Paciente" @bind-Value="filter.PacienteId" Clearable="true" AnchorOrigin="Origin.BottomCenter" Variant="Variant.Outlined" Margin="Margin.Dense">
+                <MudSelectItem T="int?" Value="null">Todos os Pacientes</MudSelectItem>
+                @foreach (var pac in listaPacientes)
+                {
+                    <MudSelectItem T="int?" Value="@((int?)pac.Id)">@pac.Nome</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="3">
+            <MudTextField @bind-Value="filter.Nome" Label="Nome do Plano" Placeholder="Buscar por título..." Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        </MudItem>
+        <MudItem xs="12" sm="2">
+            <MudDatePicker @bind-Date="filter.DataInicio" Label="Data Início" Clearable="true" Editable="true" Format="dd/MM/yyyy" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        </MudItem>
+        <MudItem xs="12" sm="2">
+            <MudDatePicker @bind-Date="filter.DataFim" Label="Data Fim" Clearable="true" Editable="true" Format="dd/MM/yyyy" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        </MudItem>
+        <MudItem xs="12" sm="2" Class="d-flex gap-2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ApplyFilters" FullWidth="true" Class="text-none rounded-lg py-2">
+                Buscar
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" OnClick="ResetFilters" FullWidth="true" Class="text-none rounded-lg py-2">
+                Limpar
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
 @if (IsLoading)
 {
     <MudProgressCircular Color="Color.Primary" Indeterminate="true" Class="d-block mx-auto mt-16" />
 }
-else if (!planos.Any())
+else if (paginatedResult.Items == null || !paginatedResult.Items.Any())
 {
     <MudPaper Class="pa-8 text-center" Elevation="0" Style="border: 1px solid #f1f5f9; border-radius: 12px;">
         <MudIcon Icon="@Icons.Material.Outlined.RestaurantMenu" Size="Size.Large" Style="color: #cbd5e1;" />
-        <MudText Typo="Typo.h6" Class="mt-4 font-bold" Style="color: #94a3b8;">Nenhum plano cadastrado</MudText>
-        <MudText Typo="Typo.body2" Style="color: #94a3b8;" Class="mt-1">Clique em "Novo Plano" para criar o primeiro plano alimentar.</MudText>
+        <MudText Typo="Typo.h6" Class="mt-4 font-bold" Style="color: #94a3b8;">Nenhum plano encontrado</MudText>
+        <MudText Typo="Typo.body2" Style="color: #94a3b8;" Class="mt-1">Tente ajustar seus filtros de busca ou crie um novo plano.</MudText>
     </MudPaper>
 }
 else
 {
     <!-- Plans List -->
     <div class="d-flex flex-column gap-4">
-        @foreach (var p in planos)
+        @foreach (var p in paginatedResult.Items)
         {
-            <MudPaper Class="nutri-card pa-4 d-flex justify-space-between align-center" Elevation="0">
+            <MudPaper Class="nutri-card pa-4 d-flex justify-space-between align-center" Elevation="0" Style="border: 1px solid #f1f5f9; border-radius: 12px; transition: transform 0.2s, box-shadow 0.2s;">
                 <div class="d-flex align-center gap-4">
-                    <div class="stat-icon-wrapper icon-green" style="width: 48px; height: 48px;">
-                        <MudIcon Icon="@Icons.Material.Filled.Fastfood" Size="Size.Medium" />
+                    <div class="stat-icon-wrapper icon-green" style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; background-color: #e8f5e9; color: #2e7d32; border-radius: 8px;">
+                        <MudIcon Icon="@Icons.Custom.Uncategorized.FoodApple" Size="Size.Medium" />
                     </div>
                     <div>
                         <MudText Typo="Typo.subtitle1" Class="font-bold">@(p.Titulo ?? "Sem título")</MudText>
                         <div class="d-flex align-center gap-2 mt-1">
-                            <MudText Typo="Typo.caption" Style="color: #6b7280;">@(p.Paciente?.Nome ?? "-")</MudText>
+                            <MudText Typo="Typo.caption" Style="color: #6b7280;">@(p.PacienteNome ?? "-")</MudText>
                             <MudText Typo="Typo.caption" Style="color: #6b7280;">·</MudText>
-                            <MudText Typo="Typo.caption" Style="color: #6b7280;">@(p.CaloriasDiarias?.ToString() ?? "-") kcal</MudText>
+                            <MudText Typo="Typo.caption" Style="color: #6b7280;">@(p.CaloriasDiarias?.ToString("0.##") ?? "-") kcal</MudText>
                             <MudText Typo="Typo.caption" Style="color: #6b7280;">·</MudText>
-                            <MudText Typo="Typo.caption" Style="color: #6b7280;">@p.Refeicoes.Count refeições</MudText>
+                            <MudText Typo="Typo.caption" Style="color: #6b7280;">@p.RefeicoesCount @(p.RefeicoesCount == 1 ? "refeição" : "refeições")</MudText>
+                            @if (p.DataCriacao.HasValue)
+                            {
+                                <MudText Typo="Typo.caption" Style="color: #6b7280;">·</MudText>
+                                <MudText Typo="Typo.caption" Style="color: #6b7280;">Criado em: @p.DataCriacao.Value.ToString("dd/MM/yyyy")</MudText>
+                            }
                         </div>
                     </div>
                 </div>
@@ -60,16 +97,28 @@ else
                     <span class="status-badge @(p.Status == "ativo" ? "ativo" : "")">@(p.Status ?? "ativo")</span>
                     <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Style="color: #6b7280;"
                                    OnClick="@(() => AbrirDetalhes(p))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                                   OnClick="@(() => AbrirEditarPlano(p))" />
                     <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Size="Size.Small" Color="Color.Error"
                                    OnClick="@(() => ExcluirPlano(p))" />
                 </div>
             </MudPaper>
         }
     </div>
+
+    <!-- Paginação -->
+    @if (paginatedResult.TotalPages > 1)
+    {
+        <div class="d-flex justify-center mt-6">
+            <MudPagination SelectedChanged="OnPageChanged" Count="paginatedResult.TotalPages" Selected="filter.Page" Variant="Variant.Outlined" Color="Color.Primary" Class="rounded-lg" />
+        </div>
+    }
 }
 
 @code {
-    private List<PlanoDieta> planos = new();
+    private List<Paciente> listaPacientes = new();
+    private PlanoDietaFilter filter = new() { Page = 1, PageSize = 10, SortBy = "DataCriacao", SortDirection = "desc" };
+    private PaginatedResult<PlanoDietaResponseDto> paginatedResult = new();
     private bool IsLoading = true;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -77,8 +126,6 @@ else
         if (firstRender)
         {
             await AuthService.InitializeAsync();
-
-
             await LoadPlanos();
             StateHasChanged();
         }
@@ -89,22 +136,15 @@ else
         IsLoading = true;
         try
         {
-            var resultPlanos = new List<PlanoDieta>();
-            var pacientes = await PacienteService.GetPacientesByUsuarioIdAsync(AuthService.CurrentUser!.Id);
-            foreach (var p in pacientes)
+            var userId = AuthService.CurrentUser!.Id;
+            if (!listaPacientes.Any())
             {
-                var pacientePlanos = await PlanoDietaService.GetPlanosPorPacienteAsync(p.Id);
-                foreach (var pl in pacientePlanos)
-                {
-                    pl.Paciente = p;
-                }
-                resultPlanos.AddRange(pacientePlanos);
+                listaPacientes = await PacienteService.GetPacientesByUsuarioIdAsync(userId);
             }
-            planos = resultPlanos.OrderByDescending(pd => pd.DataCriacao).ToList();
+            paginatedResult = await PlanoDietaService.GetPlanosFiltradosAsync(userId, filter);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erro ao carregar planos: {ex.InnerException?.Message ?? ex.Message}");
             Snackbar.Add("Erro ao carregar planos alimentares.", Severity.Error);
         }
         finally
@@ -113,7 +153,25 @@ else
         }
     }
 
-    private async Task ExcluirPlano(PlanoDieta plano)
+    private async Task ApplyFilters()
+    {
+        filter.Page = 1;
+        await LoadPlanos();
+    }
+
+    private async Task ResetFilters()
+    {
+        filter = new PlanoDietaFilter { Page = 1, PageSize = 10, SortBy = "DataCriacao", SortDirection = "desc" };
+        await LoadPlanos();
+    }
+
+    private async Task OnPageChanged(int newPage)
+    {
+        filter.Page = newPage;
+        await LoadPlanos();
+    }
+
+    private async Task ExcluirPlano(PlanoDietaResponseDto plano)
     {
         var confirm = await DialogService.ShowMessageBox(
             "Confirmar exclusão",
@@ -125,10 +183,16 @@ else
 
         try
         {
-            await PlanoDietaService.DeletePlanoDietaAsync(plano.Id);
-
-            planos.Remove(plano);
-            Snackbar.Add("Plano e refeições excluídos com sucesso.", Severity.Success);
+            var deleted = await PlanoDietaService.DeletePlanoDietaAsync(plano.Id);
+            if (deleted)
+            {
+                Snackbar.Add("Plano e refeições excluídos com sucesso.", Severity.Success);
+                await LoadPlanos();
+            }
+            else
+            {
+                Snackbar.Add("Erro ao excluir plano.", Severity.Error);
+            }
         }
         catch (Exception ex)
         {
@@ -136,9 +200,16 @@ else
         }
     }
 
-    private async Task AbrirDetalhes(PlanoDieta plano)
+    private async Task AbrirDetalhes(PlanoDietaResponseDto planoDto)
     {
-        var parameters = new DialogParameters { ["Plano"] = plano };
+        var planoCompleto = await PlanoDietaService.GetPlanoCompletoAsync(planoDto.Id);
+        if (planoCompleto == null)
+        {
+            Snackbar.Add("Erro ao carregar os detalhes do plano.", Severity.Error);
+            return;
+        }
+
+        var parameters = new DialogParameters { ["Plano"] = planoCompleto };
         var options = new DialogOptions
         {
             MaxWidth = MaxWidth.Medium,
@@ -148,4 +219,32 @@ else
         };
         await DialogService.ShowAsync<NutriFlow.Components.Dialogs.DetalhesPlanoDialog>("Detalhes do Plano", parameters, options);
     }
+
+    private async Task AbrirEditarPlano(PlanoDietaResponseDto planoDto)
+    {
+        var planoCompleto = await PlanoDietaService.GetPlanoCompletoAsync(planoDto.Id);
+        if (planoCompleto == null)
+        {
+            Snackbar.Add("Erro ao carregar o plano para edição.", Severity.Error);
+            return;
+        }
+
+        var parameters = new DialogParameters { ["PlanoModel"] = planoCompleto };
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+            CloseButton = true
+        };
+        var result = await DialogService.ShowAsync<NutriFlow.Components.Dialogs.EditarPlanoDialog>("Editar Plano", parameters, options);
+        var dialogResult = await result.Result;
+
+        if (dialogResult != null && !dialogResult.Canceled)
+        {
+            await LoadPlanos();
+            StateHasChanged();
+        }
+    }
 }
+

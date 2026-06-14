@@ -1,0 +1,7 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'nutriapp'
+    static_configs:
+      - targets: ['nutri-app:8080']

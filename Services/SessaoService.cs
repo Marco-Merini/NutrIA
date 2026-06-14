@@ -1,6 +1,7 @@
 using NutriFlow.Models;
 using NutriFlow.Repositories;
 using Microsoft.Extensions.Logging;
+using Mapster;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -102,6 +103,48 @@ namespace NutriFlow.Services
             {
                 _logger.LogError(ex, "Erro ao deletar sessão {Id}", id);
                 return false;
+            }
+        }
+        public async Task<bool> UpdateSessaoAsync(Sessao sessao)
+        {
+            try
+            {
+                var existing = await _sessaoRepository.GetByIdAsync(sessao.Id);
+                if (existing == null) return false;
+
+                existing.DataSessao = sessao.DataSessao;
+                existing.Tipo = sessao.Tipo;
+                existing.PesoSessao = sessao.PesoSessao;
+                existing.Anotacoes = sessao.Anotacoes;
+                existing.ProximaConsulta = sessao.ProximaConsulta;
+                existing.DataAtualizacao = DateTime.Now;
+
+                await _sessaoRepository.SaveChangesAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao atualizar sessão {Id}", sessao.Id);
+                return false;
+            }
+        }
+
+        public async Task<PaginatedResult<SessaoResponseDto>> GetSessoesFiltradasAsync(int usuarioId, SessaoFilter filter)
+        {
+            try
+            {
+                var (items, totalCount) = await _sessaoRepository.GetSessoesFiltradasAsync(usuarioId, filter);
+                
+                TypeAdapterConfig<Sessao, SessaoResponseDto>.NewConfig()
+                    .Map(dest => dest.PacienteNome, src => src.Paciente != null ? src.Paciente.Nome : null);
+
+                var dtos = items.Adapt<List<SessaoResponseDto>>();
+                return new PaginatedResult<SessaoResponseDto>(dtos, totalCount, filter.Page, filter.PageSize);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao buscar sessões filtradas");
+                return new PaginatedResult<SessaoResponseDto>();
             }
         }
     }

@@ -1,0 +1,110 @@
+@using NutriFlow.Models
+@using NutriFlow.Services
+@inject IPlanoDietaService PlanoDietaService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6" Class="font-bold">Editar Plano Alimentar</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="form" @bind-IsValid="success">
+            <MudGrid Spacing="4">
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="PlanoModel.Titulo" Label="Título do Plano"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" RequiredError="O título é obrigatório" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="PlanoModel.Objetivo" Label="Objetivo"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" />
+                </MudItem>
+
+                <MudItem xs="12" sm="3">
+                    <MudNumericField T="decimal?" @bind-Value="PlanoModel.CaloriasDiarias" Label="Calorias (kcal)"
+                                     Variant="Variant.Outlined" Margin="Margin.Dense" Step="1M" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudNumericField T="decimal?" @bind-Value="PlanoModel.ProteinasG" Label="Proteínas (g)"
+                                     Variant="Variant.Outlined" Margin="Margin.Dense" Step="0.1M" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudNumericField T="decimal?" @bind-Value="PlanoModel.CarboidratosG" Label="Carboidratos (g)"
+                                     Variant="Variant.Outlined" Margin="Margin.Dense" Step="0.1M" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudNumericField T="decimal?" @bind-Value="PlanoModel.GordurasG" Label="Gorduras (g)"
+                                     Variant="Variant.Outlined" Margin="Margin.Dense" Step="0.1M" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="PlanoModel.Orientacoes" Label="Orientações Gerais" Lines="4"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="PlanoModel.ObservacoesNutricionista" Label="Observações do Nutricionista" Lines="4"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar" Variant="Variant.Outlined" Class="rounded-lg text-none px-6">Cancelar</MudButton>
+        <MudButton OnClick="Salvar" Color="Color.Success" Variant="Variant.Filled" Class="rounded-lg text-none px-6"
+                   Disabled="@IsSaving">
+            @if (IsSaving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>Salvando...</span>
+            }
+            else
+            {
+                <span>Salvar Alterações</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public PlanoDieta PlanoModel { get; set; } = new();
+
+    private MudForm form = null!;
+    private bool success;
+    private bool IsSaving;
+
+    private async Task Salvar()
+    {
+        await form.Validate();
+        if (!success) return;
+
+        IsSaving = true;
+        try
+        {
+            var updated = await PlanoDietaService.UpdatePlanoDietaAsync(PlanoModel);
+            if (updated)
+            {
+                Snackbar.Add("Plano alimentar atualizado com sucesso!", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Add("Erro ao atualizar plano.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao atualizar plano: {ex.InnerException?.Message ?? ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+}

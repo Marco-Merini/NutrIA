@@ -7,14 +7,14 @@
 
 <MudDialog>
     <TitleContent>
-        <MudText Typo="Typo.h6" Class="font-bold">Registrar Progresso</MudText>
+        <MudText Typo="Typo.h6" Class="font-bold">Editar Progresso</MudText>
     </TitleContent>
     <DialogContent>
         <MudForm @ref="form" @bind-IsValid="success">
             <MudGrid Spacing="4">
                 <MudItem xs="12">
                     <MudSelect T="int?" @bind-Value="ProgressoModel.PacienteId" Label="Paciente *" Placeholder="Selecione o paciente"
-                               Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" RequiredError="Selecione um paciente">
+                               Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" RequiredError="Selecione um paciente" Disabled="true">
                         @foreach (var p in Pacientes)
                         {
                             <MudSelectItem T="int?" Value="@p.Id">@p.Nome</MudSelectItem>
@@ -23,7 +23,7 @@
                 </MudItem>
 
                 <MudItem xs="12">
-                    <MudDatePicker @bind-Date="DataRegistro" Label="Data do Registro"
+                    <MudDatePicker @bind-Date="ProgressoModel.DataRegistro" Label="Data do Registro"
                                    Variant="Variant.Outlined" Margin="Margin.Dense" DateFormat="dd/MM/yyyy" />
                 </MudItem>
 
@@ -99,7 +99,7 @@
             }
             else
             {
-                <span>Registrar</span>
+                <span>Salvar Alterações</span>
             }
         </MudButton>
     </DialogActions>
@@ -109,12 +109,13 @@
     [CascadingParameter]
     private IMudDialogInstance MudDialog { get; set; } = null!;
 
+    [Parameter]
+    public Progresso ProgressoModel { get; set; } = new();
+
     private MudForm form = null!;
     private bool success;
     private bool IsSaving;
 
-    private DateTime? DataRegistro { get; set; } = DateTime.Today;
-    private Progresso ProgressoModel { get; set; } = new();
     private List<Paciente> Pacientes { get; set; } = new();
 
     protected override async Task OnInitializedAsync()
@@ -134,21 +135,20 @@
         IsSaving = true;
         try
         {
-            ProgressoModel.DataRegistro = DataRegistro;
-            var created = await ProgressoService.AddProgressoAsync(ProgressoModel);
-            if (created)
+            var updated = await ProgressoService.UpdateProgressoAsync(ProgressoModel);
+            if (updated)
             {
-                Snackbar.Add("Progresso registrado com sucesso!", Severity.Success);
+                Snackbar.Add("Progresso atualizado com sucesso!", Severity.Success);
                 MudDialog.Close(DialogResult.Ok(true));
             }
             else
             {
-                Snackbar.Add("Erro ao registrar progresso.", Severity.Error);
+                Snackbar.Add("Erro ao atualizar progresso.", Severity.Error);
             }
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Erro ao registrar progresso: {ex.InnerException?.Message ?? ex.Message}", Severity.Error);
+            Snackbar.Add($"Erro ao atualizar progresso: {ex.InnerException?.Message ?? ex.Message}", Severity.Error);
         }
         finally
         {

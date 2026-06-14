@@ -23,32 +23,61 @@
     </MudButton>
 </div>
 
+<!-- Filtros de Pesquisa -->
+<MudPaper Class="pa-4 mb-4" Elevation="0" Style="border: 1px solid #f1f5f9; border-radius: 12px; background-color: #ffffff;">
+    <MudGrid Class="align-end">
+        <MudItem xs="12" sm="4">
+            <MudSelect T="int?" Label="Paciente" @bind-Value="filter.PacienteId" Clearable="true" AnchorOrigin="Origin.BottomCenter" Variant="Variant.Outlined" Margin="Margin.Dense">
+                <MudSelectItem T="int?" Value="null">Todos os Pacientes</MudSelectItem>
+                @foreach (var pac in listaPacientes)
+                {
+                    <MudSelectItem T="int?" Value="@((int?)pac.Id)">@pac.Nome</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="3">
+            <MudDatePicker @bind-Date="filter.DataInicio" Label="Data Início" Clearable="true" Editable="true" Format="dd/MM/yyyy" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        </MudItem>
+        <MudItem xs="12" sm="3">
+            <MudDatePicker @bind-Date="filter.DataFim" Label="Data Fim" Clearable="true" Editable="true" Format="dd/MM/yyyy" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        </MudItem>
+        <MudItem xs="12" sm="2" Class="d-flex gap-2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ApplyFilters" FullWidth="true" Class="text-none rounded-lg py-2">
+                Buscar
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" OnClick="ResetFilters" FullWidth="true" Class="text-none rounded-lg py-2">
+                Limpar
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
 @if (IsLoading)
 {
     <MudProgressCircular Color="Color.Primary" Indeterminate="true" Class="d-block mx-auto mt-16" />
 }
-else if (!sessoes.Any())
+else if (paginatedResult.Items == null || !paginatedResult.Items.Any())
 {
     <MudPaper Class="pa-8 text-center" Elevation="0" Style="border: 1px solid #f1f5f9; border-radius: 12px;">
         <MudIcon Icon="@Icons.Material.Outlined.EventNote" Size="Size.Large" Style="color: #cbd5e1;" />
-        <MudText Typo="Typo.h6" Class="mt-4 font-bold" Style="color: #94a3b8;">Nenhuma sessão registrada</MudText>
-        <MudText Typo="Typo.body2" Style="color: #94a3b8;" Class="mt-1">Clique em "Nova Sessão" para registrar a primeira consulta.</MudText>
+        <MudText Typo="Typo.h6" Class="mt-4 font-bold" Style="color: #94a3b8;">Nenhuma sessão encontrada</MudText>
+        <MudText Typo="Typo.body2" Style="color: #94a3b8;" Class="mt-1">Tente ajustar seus filtros de busca ou registre uma nova consulta.</MudText>
     </MudPaper>
 }
 else
 {
     <!-- Sessions List -->
     <div class="d-flex flex-column gap-4">
-        @foreach (var s in sessoes)
+        @foreach (var s in paginatedResult.Items)
         {
-            <MudPaper Class="nutri-card pa-4 d-flex justify-space-between align-start" Elevation="0">
+            <MudPaper Class="nutri-card pa-4 d-flex justify-space-between align-start" Elevation="0" Style="border: 1px solid #f1f5f9; border-radius: 12px; transition: transform 0.2s, box-shadow 0.2s;">
                 <div class="d-flex gap-4">
-                    <div class="stat-icon-wrapper icon-blue" style="width: 48px; height: 48px; flex-shrink: 0;">
+                    <div class="stat-icon-wrapper icon-blue" style="width: 48px; height: 48px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background-color: #e3f2fd; color: #1e88e5; border-radius: 8px;">
                         <MudIcon Icon="@Icons.Material.Filled.EventNote" Size="Size.Medium" />
                     </div>
                     <div>
                         <div class="d-flex align-center gap-3 mb-1">
-                            <MudText Typo="Typo.subtitle1" Class="font-bold">@(s.Paciente?.Nome ?? "-")</MudText>
+                            <MudText Typo="Typo.subtitle1" Class="font-bold">@(s.PacienteNome ?? "-")</MudText>
                             @if (!string.IsNullOrWhiteSpace(s.Tipo))
                             {
                                 <span class="status-badge" style="background-color: #eaf1fa; color: #5086e9;">@s.Tipo</span>
@@ -77,15 +106,29 @@ else
                     </div>
                 </div>
                 
-                <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Size="Size.Small" Color="Color.Error"
-                               OnClick="@(() => ExcluirSessao(s))" />
+                <div class="d-flex align-center gap-2">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                                   OnClick="@(() => AbrirEditarSessao(s))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Size="Size.Small" Color="Color.Error"
+                                   OnClick="@(() => ExcluirSessao(s))" />
+                </div>
             </MudPaper>
         }
     </div>
+
+    <!-- Paginação -->
+    @if (paginatedResult.TotalPages > 1)
+    {
+        <div class="d-flex justify-center mt-6">
+            <MudPagination SelectedChanged="OnPageChanged" Count="paginatedResult.TotalPages" Selected="filter.Page" Variant="Variant.Outlined" Color="Color.Primary" Class="rounded-lg" />
+        </div>
+    }
 }
 
 @code {
-    private List<Sessao> sessoes = new();
+    private List<Paciente> listaPacientes = new();
+    private SessaoFilter filter = new() { Page = 1, PageSize = 10, SortBy = "DataSessao", SortDirection = "desc" };
+    private PaginatedResult<SessaoResponseDto> paginatedResult = new();
     private bool IsLoading = true;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -93,8 +136,6 @@ else
         if (firstRender)
         {
             await AuthService.InitializeAsync();
-
-
             await LoadSessoes();
             StateHasChanged();
         }
@@ -105,17 +146,39 @@ else
         IsLoading = true;
         try
         {
-            sessoes = await SessaoService.GetSessoesPorUsuarioAsync(AuthService.CurrentUser!.Id);
+            var userId = AuthService.CurrentUser!.Id;
+            if (!listaPacientes.Any())
+            {
+                listaPacientes = await PacienteService.GetPacientesByUsuarioIdAsync(userId);
+            }
+            paginatedResult = await SessaoService.GetSessoesFiltradasAsync(userId, filter);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erro ao carregar sessões: {ex.InnerException?.Message ?? ex.Message}");
             Snackbar.Add("Erro ao carregar sessões.", Severity.Error);
         }
         finally
         {
             IsLoading = false;
         }
+    }
+
+    private async Task ApplyFilters()
+    {
+        filter.Page = 1;
+        await LoadSessoes();
+    }
+
+    private async Task ResetFilters()
+    {
+        filter = new SessaoFilter { Page = 1, PageSize = 10, SortBy = "DataSessao", SortDirection = "desc" };
+        await LoadSessoes();
+    }
+
+    private async Task OnPageChanged(int newPage)
+    {
+        filter.Page = newPage;
+        await LoadSessoes();
     }
 
     private async Task AbrirNovaSessao()
@@ -137,11 +200,38 @@ else
         }
     }
 
-    private async Task ExcluirSessao(Sessao sessao)
+    private async Task AbrirEditarSessao(SessaoResponseDto sessaoDto)
+    {
+        var sessaoCompleta = await SessaoService.GetSessaoByIdAsync(sessaoDto.Id);
+        if (sessaoCompleta == null)
+        {
+            Snackbar.Add("Erro ao carregar a sessão para edição.", Severity.Error);
+            return;
+        }
+
+        var parameters = new DialogParameters { ["SessaoModel"] = sessaoCompleta };
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+            CloseButton = true
+        };
+        var result = await DialogService.ShowAsync<NutriFlow.Components.Dialogs.EditarSessaoDialog>("Editar Sessão", parameters, options);
+        var dialogResult = await result.Result;
+
+        if (dialogResult != null && !dialogResult.Canceled)
+        {
+            await LoadSessoes();
+            StateHasChanged();
+        }
+    }
+
+    private async Task ExcluirSessao(SessaoResponseDto sessao)
     {
         var confirm = await DialogService.ShowMessageBox(
             "Confirmar exclusão",
-            $"Deseja realmente excluir esta sessão de {sessao.Paciente?.Nome ?? "paciente"}?",
+            $"Deseja realmente excluir esta sessão de {sessao.PacienteNome ?? "paciente"}?",
             yesText: "Excluir",
             cancelText: "Cancelar");
 
@@ -149,9 +239,16 @@ else
 
         try
         {
-            await SessaoService.DeleteSessaoAsync(sessao.Id);
-            sessoes.Remove(sessao);
-            Snackbar.Add("Sessão excluída com sucesso.", Severity.Success);
+            var deleted = await SessaoService.DeleteSessaoAsync(sessao.Id);
+            if (deleted)
+            {
+                Snackbar.Add("Sessão excluída com sucesso.", Severity.Success);
+                await LoadSessoes();
+            }
+            else
+            {
+                Snackbar.Add("Erro ao excluir sessão.", Severity.Error);
+            }
         }
         catch (Exception ex)
         {
