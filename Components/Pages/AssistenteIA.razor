@@ -60,12 +60,16 @@
     </div>
     <div class="d-flex align-center gap-3" style="flex-wrap: wrap;">
         <div class="d-flex flex-column flex-grow-1" style="min-width: 250px;">
-            <MudSelect T="int" @bind-Value="selectedPacienteId"
+            <MudSelect T="int"
+                       @bind-Value="selectedPacienteId"
                        @bind-Value:after="() => OnPacienteSelected(selectedPacienteId)"
-                       Placeholder="Selecione o paciente"
+                       Placeholder="Selecione um paciente"
                        Variant="Variant.Outlined"
                        AnchorOrigin="Origin.BottomCenter"
                        Class="bg-white rounded-lg">
+
+                <MudSelectItem Value="0">Selecione um paciente</MudSelectItem>
+
                 @foreach (var p in pacientes)
                 {
                     <MudSelectItem Value="@p.Id">@p.Nome</MudSelectItem>

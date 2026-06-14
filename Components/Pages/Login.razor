@@ -16,7 +16,15 @@
     <MudText Typo="Typo.body2" Align="Align.Center" Style="color: #6b7280;" Class="mb-6">Faça login para acessar o NutriAI</MudText>
 
     <MudForm @ref="form" @bind-IsValid="@success">
-        <MudTextField T="string" @bind-Value="email" Label="Email" InputType="InputType.Email" Required="true" RequiredError="O email é obrigatório" Variant="Variant.Outlined" Class="mb-4 bg-white" OnKeyDown="HandleKeyDown" />
+        <MudTextField T="string"
+                      @bind-Value="email"
+                      Label="Email"
+                      InputType="InputType.Email"
+                      Required="true"
+                      RequiredError="O email é obrigatório"
+                      Variant="Variant.Outlined"
+                      Class="mb-4 bg-white"
+                      OnKeyUp="HandleKeyUp" />
 
         <MudTextField T="string"
                       @bind-Value="senha"
@@ -26,7 +34,7 @@
                       RequiredError="A senha é obrigatória"
                       Variant="Variant.Outlined"
                       Class="mb-6 bg-white"
-                      OnKeyDown="HandleKeyDown" />
+                      OnKeyUp="HandleKeyUp" />
 
         <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" FullWidth="true" OnClick="DoLogin" Disabled="@isLoading" Class="rounded-lg py-3 font-bold text-white">
             @if (isLoading)
@@ -76,9 +84,9 @@
         await JS.InvokeVoidAsync("submitLoginForm", email, senha);
     }
 
-    private async Task HandleKeyDown(KeyboardEventArgs e)
+    private async Task HandleKeyUp(KeyboardEventArgs e)
     {
-        if (e.Key == "Enter")
+        if (e.Key == "Enter" && !isLoading)
         {
             await DoLogin();
         }
