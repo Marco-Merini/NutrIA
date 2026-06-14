@@ -38,32 +38,6 @@
                 </MudSelect>
             </MudItem>
 
-            @* ── Gerar com IA ── *@
-            <MudItem xs="12">
-                <MudPaper Class="pa-4 rounded-lg" Elevation="0"
-                          Style="background: linear-gradient(135deg, #f3e8ff 0%, #ede9fe 50%, #e8f0fe 100%); border: 1px solid #d8b4fe;">
-                    <MudText Typo="Typo.subtitle1" Class="font-bold" Style="color: #6b21a8;">
-                        Gerar plano com Inteligência Artificial
-                    </MudText>
-                    <MudText Typo="Typo.body2" Style="color: #7c3aed;" Class="mb-3">
-                        A IA analisará o perfil completo do paciente e criará um plano personalizado automaticamente.
-                    </MudText>
-                    <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.AutoAwesome" Class="rounded-lg text-none px-4"
-                               Style="background-color: #8b5cf6; color: white;" Disabled="@(PlanoModel.PacienteId == null || IsGeneratingIA)"
-                               OnClick="GerarComIA">
-                        @if (IsGeneratingIA)
-                        {
-                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" style="color: white;" />
-                            <span>Gerando...</span>
-                        }
-                        else
-                        {
-                            <span>Gerar com IA</span>
-                        }
-                    </MudButton>
-                </MudPaper>
-            </MudItem>
-
             @* ── Título ── *@
             <MudItem xs="12">
                 <MudTextField @bind-Value="PlanoModel.Titulo" Label="Título do Plano *" Required="true"
@@ -82,7 +56,7 @@
             @* ── Calorias e Status ── *@
             <MudItem xs="12" sm="6">
                 <MudNumericField @bind-Value="PlanoModel.CaloriasDiarias" Label="Calorias Diárias (kcal)"
-                                 Placeholder="2000" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                 Placeholder="" Variant="Variant.Outlined" Margin="Margin.Dense" HideSpinButtons="true" />
             </MudItem>
             <MudItem xs="12" sm="6">
                 <MudSelect T="string" @bind-Value="PlanoModel.Status" Label="Status"
@@ -95,15 +69,15 @@
             @* ── Macros ── *@
             <MudItem xs="12" sm="4">
                 <MudNumericField T="decimal?" @bind-Value="PlanoModel.ProteinasG" Label="Proteínas (g)"
-                                 Placeholder="150" Variant="Variant.Outlined" Margin="Margin.Dense" Step="1M" />
+                                 Placeholder="" Variant="Variant.Outlined" Margin="Margin.Dense" HideSpinButtons="true" />
             </MudItem>
             <MudItem xs="12" sm="4">
                 <MudNumericField T="decimal?" @bind-Value="PlanoModel.CarboidratosG" Label="Carboidratos (g)"
-                                 Placeholder="200" Variant="Variant.Outlined" Margin="Margin.Dense" Step="1M" />
+                                 Placeholder="" Variant="Variant.Outlined" Margin="Margin.Dense" HideSpinButtons="true" />
             </MudItem>
             <MudItem xs="12" sm="4">
                 <MudNumericField T="decimal?" @bind-Value="PlanoModel.GordurasG" Label="Gorduras (g)"
-                                 Placeholder="60" Variant="Variant.Outlined" Margin="Margin.Dense" Step="1M" />
+                                 Placeholder="" Variant="Variant.Outlined" Margin="Margin.Dense" HideSpinButtons="true" />
             </MudItem>
         </MudGrid>
 
@@ -112,7 +86,7 @@
             <MudText Typo="Typo.h6" Class="font-bold">Refeições</MudText>
             <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Add" Class="rounded-lg text-none px-4"
                        Style="border-color: #e2e8f0; color: #475569;" OnClick="AdicionarRefeicao">
-                Adicionar
+                Adicionar Refeições
             </MudButton>
         </div>
 
@@ -143,7 +117,7 @@
                     </MudItem>
                     <MudItem xs="12" sm="4">
                         <MudNumericField T="int?" @bind-Value="RefeicoesList[index].Calorias" Label=""
-                                         Placeholder="Calorias" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                         Placeholder="Calorias" Variant="Variant.Outlined" Margin="Margin.Dense" HideSpinButtons="true" />
                     </MudItem>
                 </MudGrid>
             </MudPaper>
@@ -271,60 +245,6 @@
         finally
         {
             IsSaving = false;
-        }
-    }
-
-    private async Task GerarComIA()
-    {
-        if (PlanoModel.PacienteId == null) return;
-        
-        IsGeneratingIA = true;
-        StateHasChanged();
-        
-        try
-        {
-            var paciente = Pacientes.FirstOrDefault(p => p.Id == PlanoModel.PacienteId);
-            if (paciente == null) return;
-
-            var result = await AIService.GenerateDietPlanAsync(paciente);
-            if (result != null)
-            {
-                PlanoModel.Titulo = result.Titulo;
-                PlanoModel.Objetivo = result.Objetivo;
-                PlanoModel.CaloriasDiarias = result.CaloriasDiarias;
-                PlanoModel.ProteinasG = result.ProteinasG;
-                PlanoModel.CarboidratosG = result.CarboidratosG;
-                PlanoModel.GordurasG = result.GordurasG;
-                PlanoModel.Orientacoes = result.Orientacoes;
-                PlanoModel.ObservacoesNutricionista = result.ObservacoesNutricionista;
-                PlanoModel.GeradoPorIa = true;
-
-                if (result.Refeicoes != null && result.Refeicoes.Any())
-                {
-                    RefeicoesList = result.Refeicoes.Select(r => new RefeicaoForm
-                    {
-                        Nome = r.Nome,
-                        HorarioTexto = r.HorarioTexto,
-                        Alimentos = r.Alimentos,
-                        Calorias = r.Calorias
-                    }).ToList();
-                }
-                
-                Snackbar.Add("Plano alimentar gerado com sucesso pela IA!", Severity.Success);
-            }
-            else
-            {
-                Snackbar.Add("Falha ao gerar o plano. O formato retornado pode ser inválido.", Severity.Error);
-            }
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add("Erro ao comunicar com a IA.", Severity.Error);
-        }
-        finally
-        {
-            IsGeneratingIA = false;
-            StateHasChanged();
         }
     }
 
