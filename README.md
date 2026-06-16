@@ -17,7 +17,7 @@ Bem-vindo ao **NutrIA** (NutriFlow), uma plataforma web inovadora baseada no eco
 
 ## 📖 Documentação Completa do TCC / Projeto Integrador
 
-Para fins acadêmicos e avaliação de bancas examinadoras de TCC, geramos uma documentação arquitetural e de engenharia de software abrangente e detalhada em:
+Documentação arquitetural e de engenharia de software abrangente e detalhada em:
 
 👉 **[Documentação Técnica Detalhada (TCC)](DOCUMENTACAO_TECNICA.md)**
 
