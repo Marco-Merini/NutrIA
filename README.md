@@ -43,3 +43,9 @@ A documentação aborda em profundidade:
 * **Inteligência Artificial:** OpenAI API (`gpt-4o-mini` & `text-embedding-3-small`)
 * **Logging & Telemetria:** Serilog & prometheus-net.AspNetCore
 * **Pipeline e Infra:** GitHub Actions, Docker, Docker Compose, AWS EC2, Prometheus & Grafana.
+
+## Licença
+
+Este projeto é proprietário e protegido por direitos autorais.
+
+Todos os direitos reservados © 2026 Marco Merini.
