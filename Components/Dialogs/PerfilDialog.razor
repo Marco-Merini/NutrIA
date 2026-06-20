@@ -1,0 +1,173 @@
+@using NutriFlow.Models
+@using NutriFlow.Services
+@using System.ComponentModel.DataAnnotations
+@inject IAuthService AuthService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6" Class="font-bold">
+            @if (isEditing)
+            {
+                <text>Editar Meus Dados</text>
+            }
+            else
+            {
+                <text>Meus Dados</text>
+            }
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="form" @bind-IsValid="success">
+            <MudGrid Spacing="3">
+                <MudItem xs="12">
+                    <MudTextField T="string" @bind-Value="nome" Label="Nome *" Required="true" RequiredError="O nome é obrigatório" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@(!isEditing)" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField T="string" @bind-Value="email" Label="Email *" Required="true" RequiredError="O email é obrigatório" Validation="@(new EmailAddressAttribute() {ErrorMessage = "Email inválido"})" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@(!isEditing)" />
+                </MudItem>
+                
+                @if (isEditing)
+                {
+                    <MudItem xs="12" sm="6">
+                        <MudTextField T="string" @bind-Value="senha" Label="Nova Senha" InputType="InputType.Password" Placeholder="Deixe em branco para manter a atual" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField T="string" @bind-Value="confirmarSenha" Label="Confirmar Nova Senha" InputType="InputType.Password" Validation="@(new Func<string, string?>(ValidateConfirmPassword))" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    </MudItem>
+                }
+                else
+                {
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.caption" Style="color: #6b7280;">Tipo de Conta</MudText>
+                        <MudText Typo="Typo.body2" Class="font-medium">@tipoConta</MudText>
+                    </MudItem>
+                }
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        @if (!isEditing)
+        {
+            <MudButton OnClick="Fechar" Variant="Variant.Outlined" Class="rounded-lg text-none px-6">Fechar</MudButton>
+            <MudButton OnClick="HabilitarEdicao" Color="Color.Primary" Variant="Variant.Filled" Class="rounded-lg text-none px-6">Editar</MudButton>
+        }
+        else
+        {
+            <MudButton OnClick="CancelarEdicao" Variant="Variant.Outlined" Class="rounded-lg text-none px-6">Cancelar</MudButton>
+            <MudButton OnClick="Salvar" Color="Color.Success" Variant="Variant.Filled" Class="rounded-lg text-none px-6" Disabled="@IsSaving">
+                @if (IsSaving)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <span>Salvando...</span>
+                }
+                else
+                {
+                    <span>Salvar</span>
+                }
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private MudForm form = null!;
+    private bool success;
+    private bool IsSaving;
+    private bool isEditing = false;
+
+    private string nome = "";
+    private string email = "";
+    private string senha = "";
+    private string confirmarSenha = "";
+    private string tipoConta = "Nutricionista";
+
+    private string originalNome = "";
+    private string originalEmail = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await AuthService.InitializeAsync();
+        if (AuthService.CurrentUser != null)
+        {
+            nome = AuthService.CurrentUser.Nome ?? "";
+            email = AuthService.CurrentUser.Email ?? "";
+            tipoConta = AuthService.CurrentUser.Tipo ?? "Nutricionista";
+
+            originalNome = nome;
+            originalEmail = email;
+        }
+    }
+
+    private string? ValidateConfirmPassword(string value)
+    {
+        if (!string.IsNullOrEmpty(senha) && value != senha)
+        {
+            return "As senhas não coincidem";
+        }
+        return null;
+    }
+
+    private void Fechar()
+    {
+        MudDialog.Close(DialogResult.Cancel());
+    }
+
+    private void HabilitarEdicao()
+    {
+        isEditing = true;
+        originalNome = nome;
+        originalEmail = email;
+    }
+
+    private void CancelarEdicao()
+    {
+        nome = originalNome;
+        email = originalEmail;
+        senha = "";
+        confirmarSenha = "";
+        isEditing = false;
+    }
+
+    private async Task Salvar()
+    {
+        await form.Validate();
+        if (!success) return;
+
+        if (AuthService.CurrentUser == null) return;
+
+        IsSaving = true;
+
+        var updatedUser = new Usuario
+        {
+            Id = AuthService.CurrentUser.Id,
+            Nome = nome,
+            Email = email,
+            Senha = string.IsNullOrEmpty(senha) ? AuthService.CurrentUser.Senha : senha,
+            Tipo = AuthService.CurrentUser.Tipo,
+            Ativo = AuthService.CurrentUser.Ativo,
+            DataCriacao = AuthService.CurrentUser.DataCriacao
+        };
+
+        var result = await AuthService.UpdateUserAsync(updatedUser);
+        if (result)
+        {
+            Snackbar.Add("Perfil atualizado com sucesso!", Severity.Success);
+            originalNome = nome;
+            originalEmail = email;
+            senha = "";
+            confirmarSenha = "";
+            isEditing = false;
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        else
+        {
+            Snackbar.Add("Erro ao atualizar o perfil. Verifique as informações.", Severity.Error);
+        }
+
+        IsSaving = false;
+    }
+}

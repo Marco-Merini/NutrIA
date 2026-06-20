@@ -1,0 +1,59 @@
+@rendermode InteractiveServer
+@inject NutriFlow.Services.IAuthService AuthService
+@inject IDialogService DialogService
+
+<MudAppBar Elevation="0"
+           Color="Color.Surface"
+           Style="border-bottom: 1px solid #e5e7eb; background-color: #ffffff !important; color: #1a1e29 !important;"
+           Dense="true">
+
+    <MudSpacer />
+
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="mr-4">
+
+        <MudText Typo="Typo.subtitle2"
+                 Style="font-family: 'Poppins', 'Segoe UI', sans-serif; font-weight: 500; color: #1a1e29 !important;">
+            @if (AuthService.CurrentUser != null)
+            {
+                <text>Bem-vindo, @AuthService.CurrentUser.Nome</text>
+            }
+            else
+            {
+                <text>Bem-vindo</text>
+            }
+        </MudText>
+
+        <MudTooltip Text="Meus Dados / Editar Perfil">
+            <MudIconButton Icon="@Icons.Material.Filled.Person"
+                           Style="color: #1a1e29 !important;"
+                           OnClick="OpenProfileDialog" />
+        </MudTooltip>
+
+    </MudStack>
+
+</MudAppBar>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        await AuthService.InitializeAsync();
+    }
+
+    private async Task OpenProfileDialog()
+    {
+        var options = new DialogOptions
+        {
+            CloseOnEscapeKey = true,
+            CloseButton = true,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true
+        };
+
+        var dialog = await DialogService.ShowAsync<NutriFlow.Components.Dialogs.PerfilDialog>("Meus Dados", options);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled)
+        {
+            StateHasChanged();
+        }
+    }
+}
