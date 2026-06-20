@@ -6,6 +6,8 @@
 <MudPopoverProvider @rendermode="InteractiveServer" />
 
 <MudLayout>
+    <TopBar />
+
     <MudDrawer Open="true" Elevation="0" Variant="DrawerVariant.Persistent" Width="260px" Class="nutri-drawer">
         <!-- Logo Area -->
         <div class="d-flex align-center py-4 px-4 nutri-brand">
@@ -46,6 +48,13 @@
             DrawerText = "#878a94",     // Inactive text
             TextPrimary = "#1a1e29",
             TextSecondary = "#6b7280"
+        },
+        Typography = new Typography()
+        {
+            Default = new DefaultTypography()
+            {
+                FontFamily = new[] { "Inter", "Helvetica", "Arial", "sans-serif" }
+            }
         }
     };
 }
