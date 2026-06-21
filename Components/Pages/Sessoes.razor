@@ -10,7 +10,7 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
-<PageTitle>Sessões - NutriAI</PageTitle>
+<PageTitle>Sessões - NutrIA</PageTitle>
 
 <div class="d-flex justify-space-between align-center mb-6">
     <div>
@@ -153,7 +153,7 @@ else
             }
             paginatedResult = await SessaoService.GetSessoesFiltradasAsync(userId, filter);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             Snackbar.Add("Erro ao carregar sessões.", Severity.Error);
         }

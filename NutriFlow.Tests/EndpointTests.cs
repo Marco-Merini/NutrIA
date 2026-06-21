@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.Builder;
 using Moq;
 using NutriFlow.Endpoints;
 using NutriFlow.Models;
@@ -160,6 +162,39 @@ namespace NutriFlow.Tests
             // Assert
             Assert.IsType<UnauthorizedHttpResult>(result);
             serviceMock.Verify(s => s.GetSessoesFiltradasAsync(It.IsAny<int>(), It.IsAny<SessaoFilter>()), Times.Never);
+        }
+
+        [Fact]
+        public void MapPlanosEndpoints_RegistersRoute()
+        {
+            var routeBuilderMock = new Mock<IEndpointRouteBuilder>();
+            routeBuilderMock.Setup(r => r.DataSources).Returns(new List<EndpointDataSource>());
+            routeBuilderMock.Setup(r => r.CreateApplicationBuilder()).Returns(new Mock<IApplicationBuilder>().Object);
+
+            PlanosEndpoints.MapPlanosEndpoints(routeBuilderMock.Object);
+            routeBuilderMock.Verify(r => r.DataSources, Times.AtLeastOnce);
+        }
+
+        [Fact]
+        public void MapProgressoEndpoints_RegistersRoute()
+        {
+            var routeBuilderMock = new Mock<IEndpointRouteBuilder>();
+            routeBuilderMock.Setup(r => r.DataSources).Returns(new List<EndpointDataSource>());
+            routeBuilderMock.Setup(r => r.CreateApplicationBuilder()).Returns(new Mock<IApplicationBuilder>().Object);
+
+            ProgressoEndpoints.MapProgressoEndpoints(routeBuilderMock.Object);
+            routeBuilderMock.Verify(r => r.DataSources, Times.AtLeastOnce);
+        }
+
+        [Fact]
+        public void MapSessoesEndpoints_RegistersRoute()
+        {
+            var routeBuilderMock = new Mock<IEndpointRouteBuilder>();
+            routeBuilderMock.Setup(r => r.DataSources).Returns(new List<EndpointDataSource>());
+            routeBuilderMock.Setup(r => r.CreateApplicationBuilder()).Returns(new Mock<IApplicationBuilder>().Object);
+
+            SessoesEndpoints.MapSessoesEndpoints(routeBuilderMock.Object);
+            routeBuilderMock.Verify(r => r.DataSources, Times.AtLeastOnce);
         }
     }
 }

@@ -82,14 +82,19 @@ namespace NutriFlow.Services
                 : new List<DocumentChunk>();
 
         public AIService(string apiKey, IServiceScopeFactory scopeFactory, IConfiguration configuration)
+            : this(
+                scopeFactory,
+                configuration,
+                new ChatClient(configuration.GetSection("RAG")["ChatModel"] ?? "gpt-4o-mini", new System.ClientModel.ApiKeyCredential(apiKey)),
+                new EmbeddingClient(configuration.GetSection("RAG")["EmbeddingModel"] ?? "text-embedding-3-small", new System.ClientModel.ApiKeyCredential(apiKey))
+            )
         {
-            var credential = new System.ClientModel.ApiKeyCredential(apiKey);
-            var ragSection = configuration.GetSection("RAG");
-            var chatModel = ragSection["ChatModel"] ?? "gpt-4o-mini";
-            var embeddingModel = ragSection["EmbeddingModel"] ?? "text-embedding-3-small";
+        }
 
-            _chatClient = new ChatClient(chatModel, credential);
-            _embeddingClient = new EmbeddingClient(embeddingModel, credential);
+        public AIService(IServiceScopeFactory scopeFactory, IConfiguration configuration, ChatClient chatClient, EmbeddingClient embeddingClient)
+        {
+            _chatClient = chatClient;
+            _embeddingClient = embeddingClient;
             _scopeFactory = scopeFactory;
             _configuration = configuration;
         }

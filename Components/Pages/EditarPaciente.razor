@@ -8,7 +8,7 @@
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
 
-<PageTitle>Editar Paciente - NutriAI</PageTitle>
+<PageTitle>Editar Paciente - NutrIA</PageTitle>
 
 @if (IsLoading)
 {
@@ -154,7 +154,7 @@ else
                 PacienteModel = await PacienteService.GetPacienteByIdAsync(Id, AuthService.CurrentUser.Id);
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             Snackbar.Add("Erro ao carregar os dados do paciente.", Severity.Error);
         }

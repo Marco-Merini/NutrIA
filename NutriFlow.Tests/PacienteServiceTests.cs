@@ -131,5 +131,145 @@ namespace NutriFlow.Tests
             Assert.True(success);
             Assert.Empty(_pacientesList);
         }
+
+        [Fact]
+        public async Task GetPacientesByUsuarioIdAsync_OnException_ReturnsEmptyList()
+        {
+            // Arrange
+            _pacienteRepoMock.Setup(r => r.GetPacientesByUsuarioIdAsync(It.IsAny<int>())).ThrowsAsync(new Exception("DB Error"));
+            var service = new PacienteService(_pacienteRepoMock.Object, _loggerMock.Object);
+
+            // Act
+            var result = await service.GetPacientesByUsuarioIdAsync(1);
+
+            // Assert
+            Assert.Empty(result);
+        }
+
+        [Fact]
+        public async Task GetPacienteByIdAsync_OnException_ReturnsNull()
+        {
+            // Arrange
+            _pacienteRepoMock.Setup(r => r.GetPacienteCompletoAsync(It.IsAny<int>(), It.IsAny<int>())).ThrowsAsync(new Exception("DB Error"));
+            var service = new PacienteService(_pacienteRepoMock.Object, _loggerMock.Object);
+
+            // Act
+            var result = await service.GetPacienteByIdAsync(1, 1);
+
+            // Assert
+            Assert.Null(result);
+        }
+
+        [Fact]
+        public async Task GetPacientesRecentesAsync_ReturnsRecentPatients()
+        {
+            // Arrange
+            var recent = new List<Paciente> { new() { Id = 1, Nome = "Recent" } };
+            _pacienteRepoMock.Setup(r => r.GetPacientesRecentesAsync(10, 2)).ReturnsAsync(recent);
+            var service = new PacienteService(_pacienteRepoMock.Object, _loggerMock.Object);
+
+            // Act
+            var result = await service.GetPacientesRecentesAsync(10, 2);
+
+            // Assert
+            Assert.Same(recent, result);
+        }
+
+        [Fact]
+        public async Task GetPacientesRecentesAsync_OnException_ReturnsEmptyList()
+        {
+            // Arrange
+            _pacienteRepoMock.Setup(r => r.GetPacientesRecentesAsync(It.IsAny<int>(), It.IsAny<int>())).ThrowsAsync(new Exception("DB Error"));
+            var service = new PacienteService(_pacienteRepoMock.Object, _loggerMock.Object);
+
+            // Act
+            var result = await service.GetPacientesRecentesAsync(1, 1);
+
+            // Assert
+            Assert.Empty(result);
+        }
+
+        [Fact]
+        public async Task AddPacienteAsync_OnException_ReturnsFalse()
+        {
+            // Arrange
+            _pacienteRepoMock.Setup(r => r.SaveChangesAsync()).ThrowsAsync(new Exception("Save failed"));
+            var service = new PacienteService(_pacienteRepoMock.Object, _loggerMock.Object);
+
+            // Act
+            var result = await service.AddPacienteAsync(new Paciente());
+
+            // Assert
+            Assert.False(result);
+        }
+
+        [Fact]
+        public async Task UpdatePacienteAsync_WhenUsuarioIdIsNull_ReturnsFalse()
+        {
+            // Arrange
+            var service = new PacienteService(_pacienteRepoMock.Object, _loggerMock.Object);
+
+            // Act
+            var result = await service.UpdatePacienteAsync(new Paciente { UsuarioId = null });
+
+            // Assert
+            Assert.False(result);
+        }
+
+        [Fact]
+        public async Task UpdatePacienteAsync_WhenPacienteDoesNotExist_ReturnsFalse()
+        {
+            // Arrange
+            _pacienteRepoMock.Setup(r => r.GetPacienteCompletoAsync(It.IsAny<int>(), It.IsAny<int>())).ReturnsAsync((Paciente?)null);
+            var service = new PacienteService(_pacienteRepoMock.Object, _loggerMock.Object);
+
+            // Act
+            var result = await service.UpdatePacienteAsync(new Paciente { Id = 99, UsuarioId = 10 });
+
+            // Assert
+            Assert.False(result);
+        }
+
+        [Fact]
+        public async Task UpdatePacienteAsync_OnException_ReturnsFalse()
+        {
+            // Arrange
+            _pacienteRepoMock.Setup(r => r.GetPacienteCompletoAsync(It.IsAny<int>(), It.IsAny<int>())).ThrowsAsync(new Exception("DB error"));
+            var service = new PacienteService(_pacienteRepoMock.Object, _loggerMock.Object);
+
+            // Act
+            var result = await service.UpdatePacienteAsync(new Paciente { Id = 1, UsuarioId = 10 });
+
+            // Assert
+            Assert.False(result);
+        }
+
+        [Fact]
+        public async Task DeletePacienteAsync_WhenPacienteDoesNotExist_ReturnsFalse()
+        {
+            // Arrange
+            _pacienteRepoMock.Setup(r => r.GetPacienteCompletoAsync(It.IsAny<int>(), It.IsAny<int>())).ReturnsAsync((Paciente?)null);
+            var service = new PacienteService(_pacienteRepoMock.Object, _loggerMock.Object);
+
+            // Act
+            var result = await service.DeletePacienteAsync(99, 10);
+
+            // Assert
+            Assert.False(result);
+        }
+
+        [Fact]
+        public async Task DeletePacienteAsync_OnException_ReturnsFalse()
+        {
+            // Arrange
+            _pacienteRepoMock.Setup(r => r.GetPacienteCompletoAsync(It.IsAny<int>(), It.IsAny<int>())).ThrowsAsync(new Exception("DB error"));
+            var service = new PacienteService(_pacienteRepoMock.Object, _loggerMock.Object);
+
+            // Act
+            var result = await service.DeletePacienteAsync(1, 10);
+
+            // Assert
+            Assert.False(result);
+        }
     }
 }
