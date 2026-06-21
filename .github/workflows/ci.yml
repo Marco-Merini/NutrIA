@@ -114,10 +114,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
-          dotnet sonarscanner begin /k:"Marco-Merini_NutrIA" /o:"marco-merini" /d:sonar.token="${{ secrets.SONAR_TOKEN }}" /d:sonar.host.url="https://sonarcloud.io" /d:sonar.cs.cobertura.reportsPaths="TestResults/**/coverage.cobertura.xml" /d:sonar.coverage.exclusions="Program.cs,Components/**/*.razor,wwwroot/**/*.js,Services/I*.cs,Repositories/I*.cs"
+          dotnet sonarscanner begin /k:"Marco-Merini_NutrIA" /o:"marco-merini" /d:sonar.token="$SONAR_TOKEN" /d:sonar.host.url="https://sonarcloud.io" /d:sonar.cs.cobertura.reportsPaths="TestResults/**/coverage.cobertura.xml" /d:sonar.coverage.exclusions="Program.cs,Components/**/*.razor,wwwroot/**/*.js,Services/I*.cs,Repositories/I*.cs,Migrations/**/*.cs,Models/**/*.cs,Services/JwtAuthenticationStateProvider.cs"
           dotnet restore
           dotnet build --no-restore --no-incremental -c Release
-          dotnet sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+          dotnet sonarscanner end /d:sonar.token="$SONAR_TOKEN"
 
   # ─────────────────────────────────────────────
   # 4. Build e push da imagem Docker

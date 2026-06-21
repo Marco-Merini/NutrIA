@@ -8,7 +8,7 @@
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
-<PageTitle>@Title - NutriAI</PageTitle>
+<PageTitle>@Title - NutrIA</PageTitle>
 
 @if (IsLoading)
 {
@@ -226,7 +226,7 @@ else
                 Paciente = await PacienteService.GetPacienteByIdAsync(Id, AuthService.CurrentUser.Id);
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             Snackbar.Add("Erro ao carregar os dados do paciente.", Severity.Error);
         }

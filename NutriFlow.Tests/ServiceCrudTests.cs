@@ -336,5 +336,176 @@ namespace NutriFlow.Tests
             Assert.Equal("Lucas", dto.PacienteNome);
             Assert.Equal("Retorno", dto.Tipo);
         }
+
+        [Fact]
+        public async Task SessaoService_UpdateSessaoAsync_UpdatesSuccessfully()
+        {
+            var repo = new Mock<ISessaoRepository>();
+            var service = new SessaoService(repo.Object, Mock.Of<ILogger<SessaoService>>());
+            var sessao = new Sessao { Id = 10, Tipo = "Old" };
+            repo.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(sessao);
+
+            var updated = new Sessao { Id = 10, Tipo = "New", PesoSessao = 70 };
+            var result = await service.UpdateSessaoAsync(updated);
+
+            Assert.True(result);
+            Assert.Equal("New", sessao.Tipo);
+            Assert.Equal(70, sessao.PesoSessao);
+            repo.Verify(r => r.SaveChangesAsync(), Times.Once);
+        }
+
+        [Fact]
+        public async Task SessaoService_UpdateSessaoAsync_WhenNotFound_ReturnsFalse()
+        {
+            var repo = new Mock<ISessaoRepository>();
+            repo.Setup(r => r.GetByIdAsync(99)).ReturnsAsync((Sessao?)null);
+            var service = new SessaoService(repo.Object, Mock.Of<ILogger<SessaoService>>());
+
+            var result = await service.UpdateSessaoAsync(new Sessao { Id = 99 });
+
+            Assert.False(result);
+        }
+
+        [Fact]
+        public async Task SessaoService_UpdateSessaoAsync_OnException_ReturnsFalse()
+        {
+            var repo = new Mock<ISessaoRepository>();
+            repo.Setup(r => r.GetByIdAsync(It.IsAny<int>())).ThrowsAsync(new Exception("DB lost"));
+            var service = new SessaoService(repo.Object, Mock.Of<ILogger<SessaoService>>());
+
+            var result = await service.UpdateSessaoAsync(new Sessao { Id = 1 });
+
+            Assert.False(result);
+        }
+
+        [Fact]
+        public async Task SessaoService_GetSessoesFiltradasAsync_OnException_ReturnsEmptyPaginatedResult()
+        {
+            var repo = new Mock<ISessaoRepository>();
+            repo.Setup(r => r.GetSessoesFiltradasAsync(It.IsAny<int>(), It.IsAny<SessaoFilter>()))
+                .ThrowsAsync(new Exception("Query error"));
+            var service = new SessaoService(repo.Object, Mock.Of<ILogger<SessaoService>>());
+
+            var filter = new SessaoFilter { Page = 1, PageSize = 10 };
+            var result = await service.GetSessoesFiltradasAsync(1, filter);
+
+            Assert.NotNull(result);
+            Assert.Empty(result.Items);
+            Assert.Equal(0, result.TotalCount);
+        }
+
+        [Fact]
+        public async Task PlanoDietaService_UpdatePlanoDietaAsync_UpdatesSuccessfully()
+        {
+            var repo = new Mock<IPlanoDietaRepository>();
+            var service = new PlanoDietaService(repo.Object, Mock.Of<ILogger<PlanoDietaService>>());
+            var plano = new PlanoDieta { Id = 10, Titulo = "Old" };
+            repo.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(plano);
+
+            var updated = new PlanoDieta { Id = 10, Titulo = "New", CaloriasDiarias = 2000 };
+            var result = await service.UpdatePlanoDietaAsync(updated);
+
+            Assert.True(result);
+            Assert.Equal("New", plano.Titulo);
+            Assert.Equal(2000, plano.CaloriasDiarias);
+            repo.Verify(r => r.SaveChangesAsync(), Times.Once);
+        }
+
+        [Fact]
+        public async Task PlanoDietaService_UpdatePlanoDietaAsync_WhenNotFound_ReturnsFalse()
+        {
+            var repo = new Mock<IPlanoDietaRepository>();
+            repo.Setup(r => r.GetByIdAsync(99)).ReturnsAsync((PlanoDieta?)null);
+            var service = new PlanoDietaService(repo.Object, Mock.Of<ILogger<PlanoDietaService>>());
+
+            var result = await service.UpdatePlanoDietaAsync(new PlanoDieta { Id = 99 });
+
+            Assert.False(result);
+        }
+
+        [Fact]
+        public async Task PlanoDietaService_UpdatePlanoDietaAsync_OnException_ReturnsFalse()
+        {
+            var repo = new Mock<IPlanoDietaRepository>();
+            repo.Setup(r => r.GetByIdAsync(It.IsAny<int>())).ThrowsAsync(new Exception("DB lost"));
+            var service = new PlanoDietaService(repo.Object, Mock.Of<ILogger<PlanoDietaService>>());
+
+            var result = await service.UpdatePlanoDietaAsync(new PlanoDieta { Id = 1 });
+
+            Assert.False(result);
+        }
+
+        [Fact]
+        public async Task PlanoDietaService_GetPlanosFiltradosAsync_OnException_ReturnsEmptyPaginatedResult()
+        {
+            var repo = new Mock<IPlanoDietaRepository>();
+            repo.Setup(r => r.GetPlanosFiltradosAsync(It.IsAny<int>(), It.IsAny<PlanoDietaFilter>()))
+                .ThrowsAsync(new Exception("Query error"));
+            var service = new PlanoDietaService(repo.Object, Mock.Of<ILogger<PlanoDietaService>>());
+
+            var filter = new PlanoDietaFilter { Page = 1, PageSize = 10 };
+            var result = await service.GetPlanosFiltradosAsync(1, filter);
+
+            Assert.NotNull(result);
+            Assert.Empty(result.Items);
+            Assert.Equal(0, result.TotalCount);
+        }
+
+        [Fact]
+        public async Task ProgressoService_UpdateProgressoAsync_UpdatesSuccessfully()
+        {
+            var repo = new Mock<IProgressoRepository>();
+            var service = new ProgressoService(repo.Object, Mock.Of<ILogger<ProgressoService>>());
+            var prog = new Progresso { Id = 10, Peso = 80 };
+            repo.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(prog);
+
+            var updated = new Progresso { Id = 10, Peso = 75, CinturaCm = 90 };
+            var result = await service.UpdateProgressoAsync(updated);
+
+            Assert.True(result);
+            Assert.Equal(75, prog.Peso);
+            Assert.Equal(90, prog.CinturaCm);
+            repo.Verify(r => r.SaveChangesAsync(), Times.Once);
+        }
+
+        [Fact]
+        public async Task ProgressoService_UpdateProgressoAsync_WhenNotFound_ReturnsFalse()
+        {
+            var repo = new Mock<IProgressoRepository>();
+            repo.Setup(r => r.GetByIdAsync(99)).ReturnsAsync((Progresso?)null);
+            var service = new ProgressoService(repo.Object, Mock.Of<ILogger<ProgressoService>>());
+
+            var result = await service.UpdateProgressoAsync(new Progresso { Id = 99 });
+
+            Assert.False(result);
+        }
+
+        [Fact]
+        public async Task ProgressoService_UpdateProgressoAsync_OnException_ReturnsFalse()
+        {
+            var repo = new Mock<IProgressoRepository>();
+            repo.Setup(r => r.GetByIdAsync(It.IsAny<int>())).ThrowsAsync(new Exception("DB lost"));
+            var service = new ProgressoService(repo.Object, Mock.Of<ILogger<ProgressoService>>());
+
+            var result = await service.UpdateProgressoAsync(new Progresso { Id = 1 });
+
+            Assert.False(result);
+        }
+
+        [Fact]
+        public async Task ProgressoService_GetProgressosFiltradosAsync_OnException_ReturnsEmptyPaginatedResult()
+        {
+            var repo = new Mock<IProgressoRepository>();
+            repo.Setup(r => r.GetProgressosFiltradosAsync(It.IsAny<int>(), It.IsAny<ProgressoFilter>()))
+                .ThrowsAsync(new Exception("Query error"));
+            var service = new ProgressoService(repo.Object, Mock.Of<ILogger<ProgressoService>>());
+
+            var filter = new ProgressoFilter { Page = 1, PageSize = 10 };
+            var result = await service.GetProgressosFiltradosAsync(1, filter);
+
+            Assert.NotNull(result);
+            Assert.Empty(result.Items);
+            Assert.Equal(0, result.TotalCount);
+        }
     }
 }

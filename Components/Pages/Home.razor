@@ -13,7 +13,7 @@
 <PageTitle>Dashboard - NutriAI</PageTitle>
 
 <div class="mb-8">
-    <MudText Typo="Typo.h5" Class="font-bold">Bem-vindo ao NutriAI</MudText>
+    <MudText Typo="Typo.h5" Class="font-bold">Bem-vindo ao NutrIA</MudText>
     <MudText Typo="Typo.body2" Color="Color.Surface" Style="color: #6b7280;">
         @DateTime.Now.ToString("dddd, dd 'de' MMMM 'de' yyyy", new System.Globalization.CultureInfo("pt-BR"))
     </MudText>
@@ -199,7 +199,7 @@
             // Sessões recentes (últimas 3)
             sessoesRecentes = await SessaoService.GetSessoesRecentesPorUsuarioAsync(userId, 3);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             Snackbar.Add("Erro ao carregar dados do dashboard.", Severity.Error);
         }

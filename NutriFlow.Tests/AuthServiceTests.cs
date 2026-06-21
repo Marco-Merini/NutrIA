@@ -6,6 +6,7 @@ using NutriFlow.Models;
 using NutriFlow.Services;
 using NutriFlow.Repositories;
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -133,6 +134,122 @@ namespace NutriFlow.Tests
             Assert.NotNull(savedUser);
             Assert.NotEqual("MyPlainPassword", savedUser.Senha);
             Assert.True(BCrypt.Net.BCrypt.Verify("MyPlainPassword", savedUser.Senha));
+        }
+
+        [Fact]
+        public async Task InitializeAsync_WhenUserIsAuthenticated_LoadsCurrentUser()
+        {
+            // Arrange
+            var user = new Usuario { Id = 10, Nome = "Nutri Autenticado", Email = "auth@nutri.com" };
+            _usersList.Add(user);
+            _usuarioRepoMock.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(user);
+
+            var claims = new List<Claim> { new Claim("UsuarioId", "10") };
+            var identity = new ClaimsIdentity(claims, "TestAuth");
+            var principal = new ClaimsPrincipal(identity);
+            var authState = new AuthenticationState(principal);
+
+            _authStateProviderMock.Setup(p => p.GetAuthenticationStateAsync())
+                .ReturnsAsync(authState);
+
+            var service = new AuthService(_usuarioRepoMock.Object, _authStateProviderMock.Object, _config);
+
+            // Act
+            await service.InitializeAsync();
+
+            // Assert
+            Assert.NotNull(service.CurrentUser);
+            Assert.Equal(10, service.CurrentUser.Id);
+            _usuarioRepoMock.Verify(r => r.GetByIdAsync(10), Times.Once);
+
+            // Calling initialize again should return immediately (already initialized)
+            await service.InitializeAsync();
+            _usuarioRepoMock.Verify(r => r.GetByIdAsync(10), Times.Once); // Still once
+        }
+
+        [Fact]
+        public async Task InitializeAsync_WhenUserNotAuthenticated_SetsCurrentUserToNull()
+        {
+            // Arrange
+            var principal = new ClaimsPrincipal(new ClaimsIdentity()); // Unauthenticated
+            var authState = new AuthenticationState(principal);
+
+            _authStateProviderMock.Setup(p => p.GetAuthenticationStateAsync())
+                .ReturnsAsync(authState);
+
+            var service = new AuthService(_usuarioRepoMock.Object, _authStateProviderMock.Object, _config);
+
+            // Act
+            await service.InitializeAsync();
+
+            // Assert
+            Assert.Null(service.CurrentUser);
+        }
+
+        [Fact]
+        public async Task InitializeAsync_WhenGetAuthenticationStateThrows_HandlesGracefully()
+        {
+            // Arrange
+            _authStateProviderMock.Setup(p => p.GetAuthenticationStateAsync())
+                .ThrowsAsync(new Exception("Simulated provider error"));
+
+            var service = new AuthService(_usuarioRepoMock.Object, _authStateProviderMock.Object, _config);
+
+            // Act & Assert (Should not throw exception)
+            var exception = await Record.ExceptionAsync(() => service.InitializeAsync());
+            Assert.Null(exception);
+            Assert.Null(service.CurrentUser);
+        }
+
+        [Fact]
+        public async Task UpdateUserAsync_WhenUserExists_UpdatesSuccessfully()
+        {
+            // Arrange
+            var user = new Usuario { Id = 5, Nome = "Nome Antigo", Email = "antigo@nutri.com", Senha = "OldHash" };
+            _usersList.Add(user);
+            _usuarioRepoMock.Setup(r => r.GetByIdAsync(5)).ReturnsAsync(user);
+
+            var service = new AuthService(_usuarioRepoMock.Object, _authStateProviderMock.Object, _config);
+            var updated = new Usuario { Id = 5, Nome = "Nome Novo", Email = "novo@nutri.com", Senha = "NewPlainPassword" };
+
+            // Act
+            var result = await service.UpdateUserAsync(updated);
+
+            // Assert
+            Assert.True(result);
+            Assert.Equal("Nome Novo", user.Nome);
+            Assert.Equal("novo@nutri.com", user.Email);
+            Assert.NotEqual("NewPlainPassword", user.Senha);
+            Assert.True(BCrypt.Net.BCrypt.Verify("NewPlainPassword", user.Senha));
+            _usuarioRepoMock.Verify(r => r.SaveChangesAsync(), Times.Once);
+        }
+
+        [Fact]
+        public async Task UpdateUserAsync_WhenUserDoesNotExist_ReturnsFalse()
+        {
+            // Arrange
+            _usuarioRepoMock.Setup(r => r.GetByIdAsync(99)).ReturnsAsync((Usuario?)null);
+            var service = new AuthService(_usuarioRepoMock.Object, _authStateProviderMock.Object, _config);
+
+            // Act
+            var result = await service.UpdateUserAsync(new Usuario { Id = 99 });
+
+            // Assert
+            Assert.False(result);
+        }
+
+        [Fact]
+        public async Task UpdateUserAsync_WhenRepoThrowsException_ReturnsFalse()
+        {
+            // Arrange
+            _usuarioRepoMock.Setup(r => r.GetByIdAsync(It.IsAny<int>())).ThrowsAsync(new Exception("DB connection lost"));
+            var service = new AuthService(_usuarioRepoMock.Object, _authStateProviderMock.Object, _config);
+
+            // Act
+            var result = await service.UpdateUserAsync(new Usuario { Id = 1 });
+
+            // Assert
+            Assert.False(result);
         }
     }
 }
