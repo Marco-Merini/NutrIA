@@ -18,8 +18,16 @@
 
     <MudForm @ref="form" @bind-IsValid="@success" @bind-Errors="@errors">
         <MudTextField T="string" @bind-Value="nome" Label="Nome" InputType="InputType.Text" Required="true" RequiredError="O nome é obrigatório" Variant="Variant.Outlined" Class="mb-4 bg-white" />
-        <MudTextField T="string" @bind-Value="email" Label="Email" InputType="InputType.Email" Required="true" RequiredError="O email é obrigatório" Variant="Variant.Outlined" Class="mb-4 bg-white" />
-        <MudTextField T="string" @bind-Value="senha" Label="Senha" InputType="InputType.Password" Required="true" RequiredError="A senha é obrigatória" Variant="Variant.Outlined" Class="mb-6 bg-white" />
+        <MudTextField T="string"
+                      @bind-Value="email"
+                      Label="Email"
+                      InputType="InputType.Email"
+                      Required="true"
+                      RequiredError="O email é obrigatório"
+                      Validation="@(new Func<string, string>(ValidateEmail))"
+                      Variant="Variant.Outlined"
+                      Class="mb-4 bg-white" />
+        <MudTextField T="string" @bind-Value="senha" Label="Senha" InputType="InputType.Password" Required="true" RequiredError="A senha é obrigatória" Variant="Variant.Outlined" Class="mb-6 bg-white" OnKeyUp="HandleKeyUp" />
         
         <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" FullWidth="true" OnClick="DoRegister" Disabled="@isLoading" Class="rounded-lg py-3 font-bold text-white">
             @if (isLoading)
@@ -80,5 +88,26 @@
             
             isLoading = false;
         }
+    }
+
+    private async Task HandleKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !isLoading)
+        {
+            await DoRegister();
+        }
+    }
+
+    private string ValidateEmail(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+            return "O email é obrigatório";
+
+        var regex = new System.Text.RegularExpressions.Regex(
+            @"^[^@\s]+@[^@\s]+\.[^@\s]+$");
+
+        return regex.IsMatch(email)
+            ? null
+            : "Informe um email válido (ex: usuario@gmail.com)";
     }
 }
