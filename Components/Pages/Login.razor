@@ -1,4 +1,6 @@
 @page "/"
+@using System.Text.RegularExpressions
+@using NutriFlow.Utils
 @rendermode InteractiveServer
 @layout NutriFlow.Components.Layout.AuthLayout
 @inject NavigationManager Navigation
@@ -22,7 +24,7 @@
                       InputType="InputType.Email"
                       Required="true"
                       RequiredError="O email é obrigatório"
-                      Validation="@(new Func<string, string>(ValidateEmail))"
+                      Validation="@(new Func<string, string?>(EmailValidator.Validate))"
                       Variant="Variant.Outlined"
                       Class="mb-4 bg-white"
                       OnKeyUp="HandleKeyUp" />
@@ -91,18 +93,5 @@
         {
             await DoLogin();
         }
-    }
-
-    private string ValidateEmail(string email)
-    {
-        if (string.IsNullOrWhiteSpace(email))
-            return "O email é obrigatório";
-
-        var regex = new System.Text.RegularExpressions.Regex(
-            @"^[^@\s]+@[^@\s]+\.[^@\s]+$");
-
-        return regex.IsMatch(email)
-            ? null
-            : "Informe um email válido (ex: usuario@gmail.com)";
     }
 }

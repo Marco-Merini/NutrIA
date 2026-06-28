@@ -5,6 +5,8 @@
 @inject NutriFlow.Services.AuthService AuthService
 @inject ISnackbar Snackbar
 @using NutriFlow.Models
+@using System.Text.RegularExpressions
+@using NutriFlow.Utils
 
 <PageTitle>Cadastro - NutrIA</PageTitle>
 
@@ -24,7 +26,7 @@
                       InputType="InputType.Email"
                       Required="true"
                       RequiredError="O email é obrigatório"
-                      Validation="@(new Func<string, string>(ValidateEmail))"
+                      Validation="@(new Func<string, string?>(EmailValidator.Validate))"
                       Variant="Variant.Outlined"
                       Class="mb-4 bg-white" />
         <MudTextField T="string" @bind-Value="senha" Label="Senha" InputType="InputType.Password" Required="true" RequiredError="A senha é obrigatória" Variant="Variant.Outlined" Class="mb-6 bg-white" OnKeyUp="HandleKeyUp" />
@@ -96,18 +98,5 @@
         {
             await DoRegister();
         }
-    }
-
-    private string ValidateEmail(string email)
-    {
-        if (string.IsNullOrWhiteSpace(email))
-            return "O email é obrigatório";
-
-        var regex = new System.Text.RegularExpressions.Regex(
-            @"^[^@\s]+@[^@\s]+\.[^@\s]+$");
-
-        return regex.IsMatch(email)
-            ? null
-            : "Informe um email válido (ex: usuario@gmail.com)";
     }
 }
