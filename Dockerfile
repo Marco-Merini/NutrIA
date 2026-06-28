@@ -16,6 +16,7 @@ COPY Services/ ./Services/
 COPY Endpoints/ ./Endpoints/
 COPY Properties/ ./Properties/
 COPY wwwroot/ ./wwwroot/
+COPY Utils/ ./Utils/
 COPY Program.cs ./
 COPY appsettings.json ./
 
