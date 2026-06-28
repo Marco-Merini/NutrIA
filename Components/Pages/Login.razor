@@ -1,11 +1,13 @@
 @page "/"
+@using System.Text.RegularExpressions
+@using NutriFlow.Utils
 @rendermode InteractiveServer
 @layout NutriFlow.Components.Layout.AuthLayout
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 @inject ISnackbar Snackbar
 
-<PageTitle>Login - NutrIA</PageTitle>
+<PageTitle>Boas vindas à NutrIA - Entrar</PageTitle>
 
 <MudPaper Elevation="3" Class="pa-8 d-flex flex-column rounded-xl" Width="400px" Style="border: 1px solid #e5e7eb;">
     <div class="d-flex justify-center mb-4">
@@ -22,6 +24,7 @@
                       InputType="InputType.Email"
                       Required="true"
                       RequiredError="O email é obrigatório"
+                      Validation="@(new Func<string, string?>(EmailValidator.Validate))"
                       Variant="Variant.Outlined"
                       Class="mb-4 bg-white"
                       OnKeyUp="HandleKeyUp" />
